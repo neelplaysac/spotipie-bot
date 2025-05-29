@@ -1,25 +1,25 @@
 import re
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Updater, CallbackContext, CommandHandler, ConversationHandler, CallbackQueryHandler
+from telegram.ext import ContextTypes, CommandHandler, ConversationHandler, CallbackQueryHandler
 
-from sp_bot import dispatcher, LOGGER
+from sp_bot import application, LOGGER
 from sp_bot.modules.db import DATABASE
 
 BOT_URL = 't.me/{}'
 REG_MSG = 'Use /register to connect your spotify account or /linkfm to connect your LastFm account to get started.'
 
 
-def style(update: Update, context: CallbackContext):
+async def style(update: Update, context: ContextTypes.DEFAULT_TYPE):
     'change background style'
 
-    if update.effective_chat.type == update.effective_chat.PRIVATE:
+    if update.effective_chat.type == "private":
         try:
             tg_id = str(update.message.from_user.id)
             is_user = DATABASE.fetchData(tg_id)
             lastfm_user = DATABASE.getLastFmUser(tg_id)
 
             if is_user == None and lastfm_user == None:
-                update.message.reply_text(REG_MSG)
+                await update.message.reply_text(REG_MSG)
                 return ConversationHandler.END
 
             keyboard = [[]]
@@ -38,24 +38,24 @@ def style(update: Update, context: CallbackContext):
                 keyboard[0].append(InlineKeyboardButton(
                     f"LastFm Scrobbles: {counterStatus}", callback_data=counterStatus))
 
-            update.effective_message.reply_text(
+            await update.effective_message.reply_text(
                 "Settings : ", reply_markup=InlineKeyboardMarkup(keyboard))
 
         except Exception as ex:
             LOGGER.exception(ex)
-            update.message.reply_text("Database Error")
+            await update.message.reply_text("Database Error")
     else:
         button = InlineKeyboardMarkup(
             [[InlineKeyboardButton(text='Contact in pm', url=BOT_URL.format(context.bot.username))]])
-        update.effective_message.reply_text(
+        await update.effective_message.reply_text(
             "Contact me in pm and use /style command to change background style.", reply_markup=button)
 
     return ConversationHandler.END
 
 
-def button(update: Update, _: CallbackContext) -> None:
+async def button(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    query.answer()
+    await query.answer()
 
     style = {"Black": "blur", "Blur": "black"}
     counter = {"Enabled": "off", "Disabled": "on"}
@@ -73,11 +73,11 @@ def button(update: Update, _: CallbackContext) -> None:
     except Exception as ex:
         LOGGER.exception(ex)
 
-    query.edit_message_text(text=f"{updatedField}: {updatedValue}")
+    await query.edit_message_text(text=f"{updatedField}: {updatedValue}")
 
 
 STYLE_HANDLER = CommandHandler("style", style)
-dispatcher.add_handler(STYLE_HANDLER)
+application.add_handler(STYLE_HANDLER)
 
 BUTTON_CALLBACK = CallbackQueryHandler(button)
-dispatcher.add_handler(BUTTON_CALLBACK)
+application.add_handler(BUTTON_CALLBACK)

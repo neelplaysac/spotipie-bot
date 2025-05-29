@@ -1,7 +1,7 @@
 import logging
 import os
 import sys
-import telegram.ext as tg
+from telegram.ext import Application
 from sp_bot.config import Config
 
 from pymongo import MongoClient
@@ -28,8 +28,8 @@ COL = Config.MONGO_COLL
 
 TEMP_CHANNEL = Config.TEMP_CHANNEL
 
-updater = tg.Updater(TOKEN, use_context=True)
-dispatcher = updater.dispatcher
+# Create application instance (replaces updater/dispatcher in v20+)
+application = Application.builder().token(TOKEN).build()
 
 # SESSION = MongoClient("localhost", 27017)
 SESSION = MongoClient(

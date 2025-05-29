@@ -1,11 +1,11 @@
 from telegram import Update
-from telegram.ext import Updater, CallbackContext, CommandHandler, ConversationHandler
+from telegram.ext import ContextTypes, CommandHandler, ConversationHandler
 
-from sp_bot import dispatcher
+from sp_bot import application
 from sp_bot.modules.db import DATABASE
 
 
-def details(update: Update, context: CallbackContext):
+async def details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     'returns the number of registered users, devs only'
     user = str(update.message.from_user.id)
     if user in ['394012198', '259972454']:
@@ -37,28 +37,28 @@ def details(update: Update, context: CallbackContext):
             f'Others: {total_lastfm_users-counter_on-counter_off}'
         ]
 
-        update.message.reply_text("\n".join(result))
+        await update.message.reply_text("\n".join(result))
     else:
-        update.effective_message.reply_text(
+        await update.effective_message.reply_text(
             "Only bot admins can use this command ^-^")
 
-    return ConversationHandler
+    return ConversationHandler.END
 
 
-def statss(update: Update, context: CallbackContext):
+async def statss(update: Update, context: ContextTypes.DEFAULT_TYPE):
     'returns the number of registered users, devs only'
     user = str(update.message.from_user.id)
     if user in ['394012198', '259972454']:
         total_users = DATABASE.countAll()
-        update.message.reply_text(total_users)
+        await update.message.reply_text(str(total_users))
     else:
-        update.effective_message.reply_text(
+        await update.effective_message.reply_text(
             "Only bot admins can use this command ^-^")
 
-    return ConversationHandler
+    return ConversationHandler.END
 
 
 STATS_HANDLER = CommandHandler("statss", statss)
-dispatcher.add_handler(STATS_HANDLER)
+application.add_handler(STATS_HANDLER)
 DETAILS_HANDLER = CommandHandler("details", details)
-dispatcher.add_handler(DETAILS_HANDLER)
+application.add_handler(DETAILS_HANDLER)

@@ -1,9 +1,10 @@
 import requests
 
-from telegram import Message, Chat, Update, Bot, User, ChatAction, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import CommandHandler, CallbackContext, ConversationHandler, run_async
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import CommandHandler, ContextTypes, ConversationHandler
+from telegram.constants import ChatAction
 
-from sp_bot import dispatcher, LOGGER
+from sp_bot import application, LOGGER
 from sp_bot.modules.db import DATABASE
 from sp_bot.modules.misc.blurr_image import blurrImage
 from sp_bot.config import Config
@@ -15,32 +16,32 @@ SCROBBLER_URL = 'http://ws.audioscrobbler.com/2.0/'
 LASTKEY = Config.LASTFM_API_KEY
 
 
-def nowLastFm(update: Update, context: CallbackContext) -> None:
+async def nowLastFm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends currently playing song when command /noww is issued."""
-    context.bot.sendChatAction(update.message.chat_id, ChatAction.TYPING)
+    await context.bot.send_chat_action(update.message.chat_id, ChatAction.TYPING)
 
     try:
         tg_id = str(update.message.from_user.id)
         is_user = DATABASE.getLastFmUser(tg_id)
         if is_user == None:
-            if update.effective_chat.type == update.effective_chat.PRIVATE:
-                update.effective_message.reply_text(
+            if update.effective_chat.type == "private":
+                await update.effective_message.reply_text(
                     "Use /linkfm command to link your lastfm account first.")
             else:
                 button = InlineKeyboardMarkup(
                     [[InlineKeyboardButton(text='Contact in pm', url=BOT_URL.format(context.bot.username))]])
-                update.effective_message.reply_text(
+                await update.effective_message.reply_text(
                     REG_MSG, reply_markup=button)
 
             return ConversationHandler.END
         elif is_user["name"] == 'User':
-            if update.effective_chat.type == update.effective_chat.PRIVATE:
-                update.effective_message.reply_text(
+            if update.effective_chat.type == "private":
+                await update.effective_message.reply_text(
                     "Use /namefm command to set a display name.")
             else:
                 button = InlineKeyboardMarkup(
                     [[InlineKeyboardButton(text='Contact in pm', url=BOT_URL.format(context.bot.username))]])
-                update.effective_message.reply_text(
+                await update.effective_message.reply_text(
                     USR_NAME_MSG, reply_markup=button)
 
             return ConversationHandler.END
@@ -54,21 +55,26 @@ def nowLastFm(update: Update, context: CallbackContext) -> None:
         return ConversationHandler.END
 
     try:
-        pfp_url = context.bot.getUserProfilePhotos(
-            tg_id, limit=1)['photos'][0][0]['file_id']
-        pfp = requests.get(context.bot.getFile(pfp_url).file_path)
+        pfp_url = await context.bot.get_user_profile_photos(
+            tg_id, limit=1)
+        if pfp_url.photos:
+            file_id = pfp_url.photos[0][0].file_id
+            file_obj = await context.bot.get_file(file_id)
+            pfp = requests.get(file_obj.file_path)
+        else:
+            pfp = None
     except:
         pfp = None
 
     try:
         if 'error' in r.json():
             response = "LastFM username is invalid. Try to relink lastfm with the bot."
-            update.message.reply_text(response)
+            await update.message.reply_text(response)
             return ConversationHandler.END
 
         elif r.status_code not in range(200, 299):
             response = "Unable to get data from LastFm."
-            update.message.reply_text(response)
+            await update.message.reply_text(response)
             return ConversationHandler.END
 
         else:
@@ -81,12 +87,12 @@ def nowLastFm(update: Update, context: CallbackContext) -> None:
             button = InlineKeyboardButton(
                 text="LastFm Song Link", url=r.json()['recenttracks']['track'][0]['url'])
 
-            context.bot.send_photo(
+            await context.bot.send_photo(
                 update.message.chat_id, image, reply_markup=InlineKeyboardMarkup([[button]]))
 
     except Exception as ex:
         LOGGER.exception(ex)
-        update.message.reply_text("Unable to get data from LastFm.")
+        await update.message.reply_text("Unable to get data from LastFm.")
 
 
 def getLastFmStatus(fm_username):
@@ -112,5 +118,5 @@ def getScrobbles(res, user):
     return scr
 
 
-LASTFM_HANDLER = CommandHandler("last", nowLastFm, run_async=True)
-dispatcher.add_handler(LASTFM_HANDLER)
+LASTFM_HANDLER = CommandHandler("last", nowLastFm)
+application.add_handler(LASTFM_HANDLER)
