@@ -1,8 +1,8 @@
-FROM python:3.11.12-slim-buster
-RUN apt-get update -y && apt-get install -y gcc
+FROM python:3.11-slim
+RUN apt-get update -y && apt-get install -y gcc && apt-get clean && rm -rf /var/lib/apt/lists/*
 LABEL maintainer="Neel"
 
-WORKDIR /usr/local/bin
+WORKDIR /app
 
 COPY requirements.txt ./
 RUN pip install -r requirements.txt
