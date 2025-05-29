@@ -8,9 +8,14 @@ class MongoOperations:
         self.db = SESSION['spotipie']
         self.cursor1 = self.db['codes']
         self.cursor2 = self.db['users']
-        self.cursor3 = self.db['lastfm']
+        self.cursor3 = self.db['lastfm']    # 'Codes' database functions
 
-    # 'Codes' database functions
+    def addCode(self, authCode, telegram_user_id):
+        code_doc = {
+            "authCode": authCode,
+            "telegram_user_id": telegram_user_id
+        }
+        return self.cursor1.insert_one(code_doc)
 
     def fetchCode(self, _id):
         query = {'_id': _id}

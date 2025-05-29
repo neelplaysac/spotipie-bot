@@ -10,6 +10,7 @@ from sp_bot.modules import ALL_MODULES
 from sp_bot import application, LOGGER, TOKEN
 from sp_bot.modules.misc.request_spotify import SPOTIFY
 from sp_bot.modules.db import DATABASE
+from sp_bot.modules.oauth_callback import oauth_callback_handler
 
 START_TEXT = '''
 Hi {},
@@ -153,13 +154,20 @@ async def get_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # main
 def main():
+    # Start the OAuth callback server
+    oauth_callback_handler.start_server()
+    
     start_handler = CommandHandler("start", start)
     help_handler = CommandHandler("help", get_help)
 
     application.add_handler(start_handler)
     application.add_handler(help_handler)
 
-    application.run_polling()
+    try:
+        application.run_polling()
+    finally:
+        # Stop the OAuth server when shutting down
+        oauth_callback_handler.stop_server()
 
 
 if __name__ == '__main__':

@@ -1,35 +1,60 @@
-# Spotipie-bot
-A python bot to share currently playing spotify songs on telegram.
+# Spotipie Bot
 
-Can be found on telegram as [Spotipiebot](https://t.me/Spotipiebot).
+A Telegram bot that allows users to share their currently playing music from both Spotify and Last.fm with beautifully styled images and track information.
 
-### Configuration
+## Features
 
-The following env variables are supported:
+### Spotify Integration
 
- - `API_KEY`: Your bot token, as a string.
+- **Now Playing**: Share your currently playing Spotify track with a custom styled image
+- **Account Linking**: Secure OAuth2 integration with Spotify API
+- **Inline Queries**: Use `@spotipiebot` to share music in any chat
+- **Custom Styling**: Choose between blur or black background styles
+- **Display Names**: Set personalized usernames for your music shares
 
- - `SPOTIFY_CLIENT_ID`: Your Spotify Client ID.
- 
- - `SPOTIFY_CLIENT_SECRET`: Your Spotify Client Secret.
- 
- - `REDIRECT_URI`: Your Spotify Authentication URL.
- 
- - `MONGO_USR`: Your MongoDB database username.
- 
- - `MONGO_PASS`: Your MongoDB database password.
- 
- - `MONGO_COLL`: Your MongoDB collection name.
- 
- - `TEMP_CHANNEL`: A temporary channel for caching images.
+### Last.fm Integration
 
-### Python dependencies
+- **Scrobble Sharing**: Share recent tracks from your Last.fm profile
+- **Play Count**: Display how many times you've listened to a track
+- **Recent Activity**: View and share your listening history
+- **Custom Display Names**: Separate display names for Last.fm posts
 
-Install the necessary python dependencies by moving to the project directory and running:
+### Visual Features
 
-```bash
-pip3 install -r requirements.txt
-```
+- **Dynamic Images**: Automatically generated images with album art, track info, and user details
+- **Profile Pictures**: Incorporates user's Telegram profile picture into the generated image
+- **Multiple Styles**: Customizable background styles for different aesthetics
 
-This will install all necessary python packages.
+### User Management
 
+- **Privacy Focused**: All interactions happen in private messages for security
+- **Easy Setup**: Simple step-by-step registration process
+- **Account Management**: Easy linking/unlinking of both Spotify and Last.fm accounts
+- **Database Storage**: Persistent user data and preferences
+
+## Available Commands
+
+- `/now` - Share currently playing Spotify track
+- `/last` - Share recent Last.fm track
+- `/register` - Link Spotify account
+- `/linkfm` - Link Last.fm account
+- `/name` - Set Spotify display name
+- `/namefm` - Set Last.fm display name
+- `/style` - Change background style
+- `/unregister` - Unlink Spotify account
+- `/unlinkfm` - Unlink Last.fm account
+
+## Technologies Used
+
+- **Python** - Core programming language
+- **python-telegram-bot** - Telegram Bot API wrapper
+- **MongoDB** - Database for user data and preferences
+- **Spotify Web API** - Music streaming service integration
+- **Last.fm API** - Music scrobbling service integration
+- **Pillow (PIL)** - Image processing and generation
+- **Requests** - HTTP client for API calls
+- **OAuth2** - Secure authentication flow
+
+## Live Bot
+
+You can find the bot running on Telegram as [@Spotipiebot](https://t.me/Spotipiebot).

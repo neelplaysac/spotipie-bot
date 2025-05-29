@@ -7,13 +7,28 @@ from sp_bot.modules.misc import Fonts
 
 
 def truncate(text, font, limit):
-    edited = True if font.getsize(text)[0] > limit else False
-    while font.getsize(text)[0] > limit:
+    try:
+        bbox = font.getbbox(text)
+        text_width = bbox[2] - bbox[0]
+    except AttributeError:
+        text_width = font.getsize(text)[0]
+
+    edited = True if text_width > limit else False
+    while True:
+        try:
+            bbox = font.getbbox(text)
+            text_width = bbox[2] - bbox[0]
+        except AttributeError:
+            text_width = font.getsize(text)[0]
+
+        if text_width <= limit:
+            break
         text = text[:-1]
+
     if edited:
-        return(text.strip() + '..')
+        return (text.strip() + '..')
     else:
-        return(text.strip())
+        return (text.strip())
 
 
 def checkUnicode(text):
@@ -55,7 +70,7 @@ def drawImage(res, username, pfp, style):
             canvas.paste(blurr_cont, (0, 0))
 
         art = Image.open(BytesIO(r.content))
-        art.thumbnail((200, 200), Image.ANTIALIAS)
+        art.thumbnail((200, 200), Image.Resampling.LANCZOS)
         canvas.paste(art, (25, 25))
     except Exception as ex:
         print(ex)
@@ -63,7 +78,7 @@ def drawImage(res, username, pfp, style):
     # profile pic
     if pfp:
         profile_pic = Image.open(BytesIO(pfp.content))
-        profile_pic.thumbnail((52, 52), Image.ANTIALIAS)
+        profile_pic.thumbnail((52, 52), Image.Resampling.LANCZOS)
         canvas.paste(profile_pic, (523, 25))
 
     # set font sizes
@@ -89,13 +104,11 @@ def drawImage(res, username, pfp, style):
     draw.text((248, 150), truncate(artists, artistfont, 315),
               fill=white, font=artistfont)
     draw.text((248, 180), truncate(albumname, albumfont, 315),
-              fill=white, font=albumfont)
-
-    # draw progress bar on canvas
-    draw.rectangle([(578, 222), (248, 224)],
+              fill=white, font=albumfont)    # draw progress bar on canvas
+    draw.rectangle([(248, 222), (578, 224)],
                    fill='#404040')
-    draw.rectangle([(248 + (currtime / totaltime * 330), 222),
-                    (248, 224)], fill='#B3B3B3')
+    draw.rectangle([(248, 222), (248 + (currtime / totaltime * 330), 224)],
+                   fill='#B3B3B3')
 
     # return canvas
     image = BytesIO()

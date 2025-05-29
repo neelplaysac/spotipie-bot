@@ -4,6 +4,7 @@ from telegram.ext import ContextTypes, CommandHandler, ConversationHandler
 from sp_bot import application
 from sp_bot.modules.db import DATABASE
 from sp_bot.modules.misc.request_spotify import SPOTIFY
+from sp_bot.modules.oauth_callback import oauth_callback_handler
 
 PM_MSG = 'Contact me in pm to /register or /unregister your account.'
 REG_MSG = 'Open the link below, to connect your Spotify account.'
@@ -14,8 +15,11 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     'add new user'
     if update.effective_chat.type == "private":
         tg_id = str(update.effective_user.id)
+        state = oauth_callback_handler.generate_state(tg_id)
+        auth_url = SPOTIFY.getAuthUrl(state=state)
+
         button = InlineKeyboardMarkup(
-            [[InlineKeyboardButton(text="Open this link to register", url=SPOTIFY.getAuthUrl())]])
+            [[InlineKeyboardButton(text="Open this link to register", url=auth_url)]])
         await update.effective_message.reply_text(
             REG_MSG, reply_markup=button)
         return ConversationHandler.END

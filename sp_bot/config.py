@@ -8,6 +8,7 @@ load_dotenv()
 class Config:
 
     API_KEY = os.getenv('API_KEY')
+    BOT_USERNAME = os.getenv('BOT_USERNAME', 'spotipiebot')
     SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
     SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
     MONGO_USR = os.getenv('MONGO_USR')

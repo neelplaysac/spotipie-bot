@@ -8,13 +8,28 @@ from sp_bot import LOGGER
 
 
 def truncate(text, font, limit):
-    edited = True if font.getsize(text)[0] > limit else False
-    while font.getsize(text)[0] > limit:
+    try:
+        bbox = font.getbbox(text)
+        text_width = bbox[2] - bbox[0]
+    except AttributeError:
+        text_width = font.getsize(text)[0]
+
+    edited = True if text_width > limit else False
+    while True:
+        try:
+            bbox = font.getbbox(text)
+            text_width = bbox[2] - bbox[0]
+        except AttributeError:
+            text_width = font.getsize(text)[0]
+
+        if text_width <= limit:
+            break
         text = text[:-1]
+
     if edited:
-        return(text.strip() + '..')
+        return (text.strip() + '..')
     else:
-        return(text.strip())
+        return (text.strip())
 
 
 def checkUnicode(text):
@@ -51,7 +66,7 @@ def blurrImage(res, username, pfp, scrobbles):
         link = coverart
         r = requests.get(link)
         art = Image.open(BytesIO(r.content))
-        art.thumbnail((200, 200), Image.ANTIALIAS)
+        art.thumbnail((200, 200), Image.Resampling.LANCZOS)
 
         bg = Image.open(BytesIO(r.content))
         bg = bg.resize((600, 600))
@@ -74,7 +89,7 @@ def blurrImage(res, username, pfp, scrobbles):
     # profile pic
     if pfp:
         profile_pic = Image.open(BytesIO(pfp.content))
-        profile_pic.thumbnail((52, 52), Image.ANTIALIAS)
+        profile_pic.thumbnail((52, 52), Image.Resampling.LANCZOS)
         canvas.paste(profile_pic, (523, 25))
 
     # set font sizes

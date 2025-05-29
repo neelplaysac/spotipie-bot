@@ -130,3 +130,4 @@ dmypy.json
 
 # Test files
 test_bot.py
+test_oauth.py
