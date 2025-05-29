@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class OAuthCallbackHandler:
-    def __init__(self, host='localhost', port=6969):
+    def __init__(self, host='0.0.0.0', port=6969):
         self.host = host
         self.port = port
         self.pending_states = {}
@@ -123,6 +123,11 @@ class OAuthCallbackHandler:
 
     def start_server(self):
         """Start the OAuth callback server"""
+        # If using external REDIRECT_URI, ensure we bind to all interfaces
+        if Config.REDIRECT_URI and self.host == 'localhost':
+            self.host = '0.0.0.0'
+            logger.info(f"External REDIRECT_URI detected, binding to all interfaces")
+
         if self.server is not None:
             logger.warning("Server is already running")
             return
@@ -133,6 +138,8 @@ class OAuthCallbackHandler:
 
             def run_server():
                 logger.info(f"Starting OAuth callback server on {self.host}:{self.port}")
+                if self.host == '0.0.0.0' and Config.REDIRECT_URI:
+                    logger.info(f"Server accessible via: {Config.REDIRECT_URI}")
                 self.server.serve_forever()
 
             self.server_thread = Thread(target=run_server, daemon=True)
