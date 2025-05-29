@@ -17,7 +17,6 @@ please use /unregister command in pm and /register again.
 BOT_URL = 't.me/{}'
 
 
-@run_async
 def nowPlaying(update: Update, context: CallbackContext) -> None:
     """Sends currently playing song when command /noww is issued."""
     context.bot.sendChatAction(update.message.chat_id, ChatAction.TYPING)
@@ -58,7 +57,7 @@ def nowPlaying(update: Update, context: CallbackContext) -> None:
             tg_id, limit=1)['photos'][0][0]['file_id']
         pfp = requests.get(context.bot.getFile(pfp_url).file_path)
     except:
-        pfp = 'https://files.catbox.moe/eb9roq.png'
+        pfp = None
 
     try:
         res = r.json()
@@ -67,7 +66,8 @@ def nowPlaying(update: Update, context: CallbackContext) -> None:
 
         elif res['currently_playing_type'] == 'track':
             username = is_user["username"]
-            image = drawImage(res, username, pfp)
+            style = is_user["style"]
+            image = drawImage(res, username, pfp, style)
             button = InlineKeyboardButton(
                 text="Play on Spotify", url=res['item']['external_urls']['spotify'])
 
@@ -82,5 +82,5 @@ def nowPlaying(update: Update, context: CallbackContext) -> None:
         update.message.reply_text("You are not listening to anything.")
 
 
-NOW_PLAYING_HANDLER = CommandHandler("now", nowPlaying)
+NOW_PLAYING_HANDLER = CommandHandler("now", nowPlaying, run_async=True)
 dispatcher.add_handler(NOW_PLAYING_HANDLER)

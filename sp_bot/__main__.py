@@ -25,6 +25,11 @@ Follow these steps to start using the bot -
 thats it! you can then share your song status using -
 /now or using the inline query @spotipiebot.
 
+You can also use /linkfm to connect your lastfm account.
+Then set a display name using /namefm.
+and use /last to share song status.
+
+use /style to change background style.
 use /help to get the list of commands.
 '''
 
@@ -32,10 +37,18 @@ HELP_TEXT = '''
 Heres the list of commands -
 
 /now - share currently playing song on spotify.
-/name - change your username.
+/name - change your display name on song status.
 /unregister - to unlink your spotify account from the bot.
 /register - to connect your spotify account with the bot.
+/style - change background style to blur or black.
 @spotipiebot - share song using inline query
+
+/last - share lastfm song status.
+/linkfm - link LastFm account with the bot.
+/namefm - set display name for LastFm status.
+/unlinkfm - unlink LastFm account from bot.
+/status - recently played song via LastFm.
+
 '''
 
 IMPORTED = {}
@@ -78,6 +91,9 @@ def start(update: Update, context: CallbackContext):
         elif text.endswith('notlistening'):
             update.message.reply_text(
                 "You're not listening to anything on Spotify at the moment.")
+        elif text.endswith('lastfm'):
+            update.message.reply_text(
+                "To link your lastfm account use /lastfm command.")
         else:
             _id = text[7:]
             try:

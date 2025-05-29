@@ -11,3 +11,4 @@ class Config:
     MONGO_COLL = os.getenv('MONGO_COLL')
     TEMP_CHANNEL = os.getenv('TEMP_CHANNEL')
     REDIRECT_URI = os.getenv('REDIRECT_URI')
+    LASTFM_API_KEY = os.getenv('LASTFM_API_KEY')

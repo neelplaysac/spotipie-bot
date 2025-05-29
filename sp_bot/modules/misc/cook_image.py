@@ -1,6 +1,6 @@
 import math
 import requests
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 from io import BytesIO
 
 from sp_bot.modules.misc import Fonts
@@ -20,7 +20,7 @@ def checkUnicode(text):
     return text == str(text.encode('utf-8'))[2:-1]
 
 
-def drawImage(res, username, pfp):
+def drawImage(res, username, pfp, style):
     songname = res['item']['name']
     albumname = res['item']['album']['name']
     totaltime = res['item']['duration_ms']
@@ -38,6 +38,22 @@ def drawImage(res, username, pfp):
     try:
         link = coverart
         r = requests.get(link)
+
+        if style == "blur":
+            bg = Image.open(BytesIO(r.content))
+            bg = bg.resize((600, 600))
+            bg = bg.crop((0, 175, 600, 425))
+
+            blurr = bg.filter(ImageFilter.GaussianBlur(radius=25))
+
+            blurr_dark = ImageEnhance.Brightness(blurr)
+            blurr_dark = blurr_dark.enhance(0.9)
+
+            blurr_cont = ImageEnhance.Contrast(blurr_dark)
+            blurr_cont = blurr_cont.enhance(0.8)
+
+            canvas.paste(blurr_cont, (0, 0))
+
         art = Image.open(BytesIO(r.content))
         art.thumbnail((200, 200), Image.ANTIALIAS)
         canvas.paste(art, (25, 25))
@@ -45,15 +61,16 @@ def drawImage(res, username, pfp):
         print(ex)
 
     # profile pic
-    profile_pic = Image.open(BytesIO(pfp.content))
-    profile_pic.thumbnail((52, 52), Image.ANTIALIAS)
-    canvas.paste(profile_pic, (523, 25))
+    if pfp:
+        profile_pic = Image.open(BytesIO(pfp.content))
+        profile_pic.thumbnail((52, 52), Image.ANTIALIAS)
+        canvas.paste(profile_pic, (523, 25))
 
     # set font sizes
-    open_sans = ImageFont.truetype(Fonts.OPEN_SANS, 23)
+    open_sans = ImageFont.truetype(Fonts.OPEN_SANS, 24)
     # open_bold = ImageFont.truetype(Fonts.OPEN_BOLD, 23)
-    poppins = ImageFont.truetype(Fonts.POPPINS, 25)
-    arial = ImageFont.truetype(Fonts.ARIAL, 25)
+    poppins = ImageFont.truetype(Fonts.POPPINS, 26)
+    arial = ImageFont.truetype(Fonts.ARIAL, 26)
     arial23 = ImageFont.truetype(Fonts.ARIAL, 23)
 
     # assign fonts

@@ -39,7 +39,8 @@ def inlineNowPlaying(update: Update, context: CallbackContext):
             tg_id, limit=1)['photos'][0][0]['file_id']
         pfp = requests.get(context.bot.getFile(pfp_url).file_path)
     except:
-        pfp = 'https://files.catbox.moe/eb9roq.png'
+        pfp = None
+
 
     try:
         res = r.json()
@@ -48,7 +49,8 @@ def inlineNowPlaying(update: Update, context: CallbackContext):
                 [], switch_pm_text="You are listening to ads.", switch_pm_parameter='ads', cache_time=0)
         elif res['currently_playing_type'] == 'track':
             username = is_user["username"]
-            image = drawImage(res, username, pfp)
+            style = is_user["style"]
+            image = drawImage(res, username, pfp, style)
             button = InlineKeyboardButton(
                 text="Play on Spotify", url=res['item']['external_urls']['spotify'])
             temp = context.bot.send_photo(TEMP_CHANNEL, photo=image)
