@@ -64,7 +64,8 @@ class OAuthCallbackHandler:
                         logger.error(f"Invalid state: {state}")
                         self.send_error_response("Invalid or expired authorization request.")
                         return
-                      # Store the auth code in database
+
+                    # Store the auth code in database
                     try:
                         result = DATABASE.addCode(code, telegram_user_id)
                         if result:
@@ -154,6 +155,9 @@ class OAuthCallbackHandler:
 
     def get_callback_url(self) -> str:
         """Get the callback URL for OAuth registration"""
+        redirect_uri = Config.REDIRECT_URI
+        if redirect_uri:
+            return redirect_uri
         return f"http://{self.host}:{self.port}/callback"
 
 
