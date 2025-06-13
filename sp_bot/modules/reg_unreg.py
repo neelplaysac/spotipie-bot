@@ -4,7 +4,6 @@ from telegram.ext import ContextTypes, CommandHandler, ConversationHandler
 from sp_bot import application
 from sp_bot.modules.db import DATABASE
 from sp_bot.modules.misc.request_spotify import SPOTIFY
-from sp_bot.modules.oauth_callback import oauth_callback_handler
 
 PM_MSG = 'Contact me in pm to /register or /unregister your account.'
 REG_MSG = 'Open the link below, to connect your Spotify account.'

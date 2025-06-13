@@ -1,7 +1,6 @@
 import requests
 import json
 from sp_bot import CLIENT_ID, CLIENT_SECRET, REDIRECT_URI
-from sp_bot.modules.oauth_callback import oauth_callback_handler
 
 
 class SpotifyUser:
@@ -14,11 +13,8 @@ class SpotifyUser:
         self.redirect_uri = redirect_uri
 
     def getAuthUrl(self):
-        callback_url = oauth_callback_handler.get_callback_url()
-        redirect_uri = callback_url if callback_url else self.redirect_uri
-
         authorization_redirect_url = self.authorize_url + '?response_type=code&client_id=' + \
-            self.client_id + '&redirect_uri=' + redirect_uri + \
+            self.client_id + '&redirect_uri=' + self.redirect_uri + \
             '&scope=user-read-currently-playing'
         return authorization_redirect_url
 
