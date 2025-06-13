@@ -177,7 +177,6 @@ def main():
     finally:
         # Stop the OAuth server when shutting down
         LOGGER.info("🛑 Shutting down OAuth callback server...")
-        oauth_callback_handler.stop_server()
 
 
 if __name__ == '__main__':
