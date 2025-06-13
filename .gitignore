@@ -131,3 +131,6 @@ dmypy.json
 # Test files
 test_bot.py
 test_oauth.py
+
+# Old version folder
+spotipie-v2/

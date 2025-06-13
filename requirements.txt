@@ -3,4 +3,3 @@ requests>=2.31.0
 Pillow>=10.0.0
 pymongo>=4.5.0
 python-dotenv>=1.0.0
-flask>=3.0.0

@@ -94,40 +94,35 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(
                 "To link your lastfm account use /lastfm command.")
         else:
-            _id = text[7:]
+            document_id = text[7:]
             try:
-                codeObject = DATABASE.fetchCode(ObjectId(_id))
-                _ = DATABASE.deleteCode(ObjectId(_id))
-            except Exception as ex:
+                tg_id = str(update.effective_user.id)
+                is_user = DATABASE.fetchData(tg_id)
+                if is_user != None:
+                    await update.message.reply_text(
+                        "You are already registered. If the bot is not working /unregister and /register again.")
+                    return ConversationHandler.END
+
+                # Get auth code from Node.js server
+                authcode = oauth_callback_handler.check_auth_code(document_id)
+                if not authcode:
+                    await update.message.reply_text(
+                        "Please use /register command to initiate the login process.")
+                    return ConversationHandler.END
+
+                refreshToken = SPOTIFY.getAccessToken(authcode)
+                if refreshToken == 'error':
+                    await update.message.reply_text(
+                        "Unable to authenticate. Please try again using /register. If you are having issues using the bot contact in support chat (check bot info)")
+                    return ConversationHandler.END
+
+                user = DATABASE.addUser(tg_id, refreshToken)
                 await update.message.reply_text(
-                    "Please use /register command to initiate the login process.")
+                    "Account successfully linked. Now use /name to set a display name then use /now to use the bot.")
+            except Exception as ex:
+                await update.message.reply_text("Database Error")
                 LOGGER.exception(ex)
                 return ConversationHandler.END
-
-            if codeObject is None:
-                await update.message.reply_text(
-                    "Please use /register command to initiate the login process.")
-            else:
-                try:
-                    tg_id = str(update.effective_user.id)
-                    is_user = DATABASE.fetchData(tg_id)
-                    if is_user != None:
-                        await update.message.reply_text(
-                            "You are already registered. If the bot is not working /unregister and /register again.")
-                        return ConversationHandler.END
-                    authcode = codeObject["authCode"]
-                    refreshToken = SPOTIFY.getAccessToken(authcode)
-                    if refreshToken == 'error':
-                        await update.message.reply_text(
-                            "Unable to authenticate. Please try again using /register. If you are having issues using the bot contact in support chat (check bot info)")
-                        return ConversationHandler.END
-                    user = DATABASE.addUser(tg_id, refreshToken)
-                    await update.message.reply_text(
-                        "Account successfully linked. Now use /name to set a display name then use /now to use the bot.")
-                except Exception as ex:
-                    await update.message.reply_text("Database Error")
-                    LOGGER.exception(ex)
-                    return ConversationHandler.END
 
         await update.effective_message.delete()
         return ConversationHandler.END
@@ -156,13 +151,7 @@ async def get_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     LOGGER.info("🤖 Starting Spotipie Bot...")
 
-    # Start the OAuth callback server
-    LOGGER.info("🚀 Starting OAuth callback server...")
-    oauth_callback_handler.start_server()
-
-    # Log server details
-    LOGGER.info(f"🌐 OAuth server host: {oauth_callback_handler.host}")
-    LOGGER.info(f"🔌 OAuth server port: {oauth_callback_handler.port}")
+    # Log OAuth callback URL
     LOGGER.info(f"🔗 OAuth callback URL: {oauth_callback_handler.get_callback_url()}")
 
     start_handler = CommandHandler("start", start)

@@ -13,16 +13,13 @@ class SpotifyUser:
         self.client_secret = client_secret
         self.redirect_uri = redirect_uri
 
-    def getAuthUrl(self, state=None):
-        # Use the OAuth callback handler's URL if available, otherwise fall back to configured redirect URI
+    def getAuthUrl(self):
         callback_url = oauth_callback_handler.get_callback_url()
         redirect_uri = callback_url if callback_url else self.redirect_uri
-        
+
         authorization_redirect_url = self.authorize_url + '?response_type=code&client_id=' + \
             self.client_id + '&redirect_uri=' + redirect_uri + \
             '&scope=user-read-currently-playing'
-        if state:
-            authorization_redirect_url += '&state=' + state
         return authorization_redirect_url
 
     def getAccessToken(self, authCode):

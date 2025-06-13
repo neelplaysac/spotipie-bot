@@ -15,8 +15,7 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     'add new user'
     if update.effective_chat.type == "private":
         tg_id = str(update.effective_user.id)
-        state = oauth_callback_handler.generate_state(tg_id)
-        auth_url = SPOTIFY.getAuthUrl(state=state)
+        auth_url = SPOTIFY.getAuthUrl()
 
         button = InlineKeyboardMarkup(
             [[InlineKeyboardButton(text="Open this link to register", url=auth_url)]])
