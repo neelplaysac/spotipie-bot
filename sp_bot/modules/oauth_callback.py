@@ -125,7 +125,11 @@ class OAuthCallbackHandler:
             if Config.REDIRECT_URI:
                 logger.info(f"Server accessible via: {Config.REDIRECT_URI}")
 
-            # Run Flask app
+            # Add extra logging for debugging
+            logger.info(f"Flask server binding to host: {self.host}")
+            logger.info(f"Flask server listening on port: {self.port}")
+
+            # Run Flask app with production-ready settings
             self.app.run(
                 host=self.host,
                 port=self.port,
@@ -136,6 +140,11 @@ class OAuthCallbackHandler:
 
         self.server_thread = Thread(target=run_server, daemon=True)
         self.server_thread.start()
+
+        # Add a small delay and log confirmation
+        import time
+        time.sleep(1)
+        logger.info(f"Flask OAuth callback server thread started successfully")
 
     def stop_server(self):
         """Stop the Flask OAuth callback server"""

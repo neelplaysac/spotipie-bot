@@ -141,10 +141,10 @@ async def get_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ONLY send help in PM
     if update.effective_chat.type != "private":
         await update.effective_message.reply_text("Contact me in PM to get the list of possible commands.",
-                                            reply_markup=InlineKeyboardMarkup(
-                                                [[InlineKeyboardButton(text="Help",
-                                                                       url="t.me/{}?start=help".format(
-                                                                           context.bot.username))]]))
+                                                  reply_markup=InlineKeyboardMarkup(
+                                                      [[InlineKeyboardButton(text="Help",
+                                                                             url="t.me/{}?start=help".format(
+                                                                                 context.bot.username))]]))
         return
 
     else:
@@ -154,9 +154,17 @@ async def get_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # main
 def main():
+    LOGGER.info("🤖 Starting Spotipie Bot...")
+
     # Start the OAuth callback server
+    LOGGER.info("🚀 Starting OAuth callback server...")
     oauth_callback_handler.start_server()
-    
+
+    # Log server details
+    LOGGER.info(f"🌐 OAuth server host: {oauth_callback_handler.host}")
+    LOGGER.info(f"🔌 OAuth server port: {oauth_callback_handler.port}")
+    LOGGER.info(f"🔗 OAuth callback URL: {oauth_callback_handler.get_callback_url()}")
+
     start_handler = CommandHandler("start", start)
     help_handler = CommandHandler("help", get_help)
 
@@ -164,9 +172,11 @@ def main():
     application.add_handler(help_handler)
 
     try:
+        LOGGER.info("🎯 Starting Telegram bot polling...")
         application.run_polling()
     finally:
         # Stop the OAuth server when shutting down
+        LOGGER.info("🛑 Shutting down OAuth callback server...")
         oauth_callback_handler.stop_server()
 
 
