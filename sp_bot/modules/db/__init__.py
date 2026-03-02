@@ -46,7 +46,7 @@ class MongoOperations:
         self.cursor2.delete_one(query)
 
     def countAll(self):
-        return self.cursor2.find().count()
+        return self.cursor2.count_documents({})
 
     def aggregateUsers(self):
         pipeline = [
@@ -94,7 +94,7 @@ class MongoOperations:
         self.cursor3.delete_one(query)
 
     def countAllLastFm(self):
-        return self.cursor3.find().count()
+        return self.cursor3.count_documents({})
 
     def aggregateLastFmUsers(self):
         pipeline = [
