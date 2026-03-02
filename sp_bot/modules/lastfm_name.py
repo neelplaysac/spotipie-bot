@@ -3,6 +3,7 @@ from telegram.ext import ContextTypes, CommandHandler, ConversationHandler, filt
 
 from sp_bot import application, LOGGER
 from sp_bot.modules.db import DATABASE
+from sp_bot.modules.misc.cooldown import cooldown
 
 
 PM_MSG = 'Contact me in pm to change your display name.'
@@ -11,6 +12,7 @@ BOT_URL = 't.me/{}'
 
 
 # /username command
+@cooldown(seconds=3)
 async def getLastFmUserData(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     'ask user for usename'
     if update.effective_chat.type != "private":

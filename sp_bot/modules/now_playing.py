@@ -8,6 +8,7 @@ from sp_bot import application
 from sp_bot.modules.misc.cook_image import drawImage
 from sp_bot.modules.db import DATABASE
 from sp_bot.modules.misc.request_spotify import SPOTIFY
+from sp_bot.modules.misc.cooldown import cooldown
 
 REG_MSG = 'You need to connect your Spotify account first. Contact me in pm and use /register command.'
 USR_NAME_MSG = 'You need to add a username to start using the bot. Contact me in pm and use /name command.'
@@ -18,6 +19,7 @@ please use /unregister command in pm and /register again.
 BOT_URL = 't.me/{}'
 
 
+@cooldown(seconds=5)
 async def nowPlaying(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends currently playing song when command /noww is issued."""
     await context.bot.send_chat_action(update.message.chat_id, ChatAction.TYPING)

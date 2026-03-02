@@ -10,6 +10,7 @@ from sp_bot.modules import ALL_MODULES
 from sp_bot import application, LOGGER, TOKEN
 from sp_bot.modules.misc.request_spotify import SPOTIFY
 from sp_bot.modules.db import DATABASE
+from sp_bot.modules.misc.cooldown import cooldown
 
 START_TEXT = '''
 Hi {},

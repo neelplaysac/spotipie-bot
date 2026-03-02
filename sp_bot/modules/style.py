@@ -4,11 +4,13 @@ from telegram.ext import ContextTypes, CommandHandler, ConversationHandler, Call
 
 from sp_bot import application, LOGGER
 from sp_bot.modules.db import DATABASE
+from sp_bot.modules.misc.cooldown import cooldown
 
 BOT_URL = 't.me/{}'
 REG_MSG = 'Use /register to connect your spotify account or /linkfm to connect your LastFm account to get started.'
 
 
+@cooldown(seconds=3)
 async def style(update: Update, context: ContextTypes.DEFAULT_TYPE):
     'change background style'
 
@@ -53,6 +55,7 @@ async def style(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
+@cooldown(seconds=3)
 async def button(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()

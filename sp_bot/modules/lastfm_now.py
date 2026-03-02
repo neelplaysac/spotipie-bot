@@ -8,6 +8,7 @@ from sp_bot import application, LOGGER
 from sp_bot.modules.db import DATABASE
 from sp_bot.modules.misc.blurr_image import blurrImage
 from sp_bot.config import Config
+from sp_bot.modules.misc.cooldown import cooldown
 
 REG_MSG = 'You need to connect your LastFm account first. Contact me in pm and use /linkfm command.'
 USR_NAME_MSG = 'You need to add a display name to start using the bot. Contact me in pm and use /linkfm command.'
@@ -16,6 +17,7 @@ SCROBBLER_URL = 'http://ws.audioscrobbler.com/2.0/'
 LASTKEY = Config.LASTFM_API_KEY
 
 
+@cooldown(seconds=5)
 async def nowLastFm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends currently playing song when command /noww is issued."""
     await context.bot.send_chat_action(update.message.chat_id, ChatAction.TYPING)

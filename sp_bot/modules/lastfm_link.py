@@ -3,12 +3,14 @@ from telegram.ext import ContextTypes, CommandHandler, ConversationHandler, filt
 
 from sp_bot import application, LOGGER
 from sp_bot.modules.db import DATABASE
+from sp_bot.modules.misc.cooldown import cooldown
 
 PM_MSG = 'Contact me in pm and use /linkfm to link or /unlinkfm to unlink your LastFm account.'
 REG_MSG = 'Open the link below, to connect your LastFm account.'
 BOT_URL = 't.me/{}'
 
 
+@cooldown(seconds=3)
 async def getLastFmUserName(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     'ask user for usename'
     if update.effective_chat.type != "private":
@@ -61,6 +63,7 @@ async def cancel(update, context):
     return ConversationHandler.END
 
 
+@cooldown(seconds=3)
 async def unLinkFm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     'add new user'
     if update.effective_chat.type == "private":
