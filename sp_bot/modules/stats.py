@@ -3,12 +3,13 @@ from telegram.ext import ContextTypes, CommandHandler, ConversationHandler
 
 from sp_bot import application
 from sp_bot.modules.db import DATABASE
+from sp_bot.config import Config
 
 
 async def details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     'returns the number of registered users, devs only'
     user = str(update.message.from_user.id)
-    if user in ['394012198', '259972454']:
+    if user in Config.ADMIN_IDS:
 
         total_users = DATABASE.countAll()
         total_lastfm_users = DATABASE.countAllLastFm()
@@ -48,7 +49,7 @@ async def details(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def statss(update: Update, context: ContextTypes.DEFAULT_TYPE):
     'returns the number of registered users, devs only'
     user = str(update.message.from_user.id)
-    if user in ['394012198', '259972454']:
+    if user in Config.ADMIN_IDS:
         total_users = DATABASE.countAll()
         await update.message.reply_text(str(total_users))
     else:

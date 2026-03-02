@@ -1,9 +1,10 @@
 import math
-import requests
+import httpx
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 from io import BytesIO
 
 from sp_bot.modules.misc import Fonts
+from sp_bot import LOGGER
 
 
 def truncate(text, font, limit):
@@ -35,7 +36,7 @@ def checkUnicode(text):
     return text == str(text.encode('utf-8'))[2:-1]
 
 
-def drawImage(res, username, pfp, style):
+async def drawImage(res, username, pfp, style):
     songname = res['item']['name']
     albumname = res['item']['album']['name']
     totaltime = res['item']['duration_ms']
@@ -52,7 +53,8 @@ def drawImage(res, username, pfp, style):
     # album art
     try:
         link = coverart
-        r = requests.get(link)
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            r = await client.get(link)
 
         if style == "blur":
             bg = Image.open(BytesIO(r.content))
@@ -73,7 +75,7 @@ def drawImage(res, username, pfp, style):
         art.thumbnail((200, 200), Image.Resampling.LANCZOS)
         canvas.paste(art, (25, 25))
     except Exception as ex:
-        print(ex)
+        LOGGER.exception(ex)
 
     # profile pic
     if pfp:

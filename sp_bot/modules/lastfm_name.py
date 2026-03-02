@@ -30,20 +30,16 @@ async def getLastFmUserData(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 async def setLastFmUserData(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     'save username in db'
     text = update.effective_message.text.strip()
-    if len(text) > 15:
+    if not text or len(text) > 15 or text.startswith('/'):
         await update.message.reply_text(
-            "Invalid username. Try again using /namefm ")
-        return ConversationHandler.END
-    elif text.startswith('/'):
-        await update.message.reply_text(
-            "Invalid username. Try again using /namefm ")
+            "Invalid username. Must be 1-15 characters and not start with /. Try again using /namefm")
         return ConversationHandler.END
     else:
         try:
             tg_id = str(update.message.from_user.id)
             is_user = DATABASE.getLastFmUser(tg_id)
 
-            if is_user == None:
+            if is_user is None:
                 await update.message.reply_text(REG_MSG)
                 return ConversationHandler.END
             else:
@@ -68,6 +64,7 @@ NAMEFM_HANDLER = ConversationHandler(
     entry_points=[CommandHandler('namefm', getLastFmUserData)],
     states={LASTFM_DISPLAY_NAME: [MessageHandler(
             filters.TEXT & ~filters.COMMAND, setLastFmUserData)]},
-    fallbacks=[CommandHandler('cancel', cancel)])
+    fallbacks=[CommandHandler('cancel', cancel)],
+    conversation_timeout=60)
 
 application.add_handler(NAMEFM_HANDLER)

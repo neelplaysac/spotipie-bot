@@ -1,10 +1,10 @@
-import requests
+import httpx
 from uuid import uuid4
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, InlineQueryResultCachedPhoto
 from telegram.ext import ContextTypes, InlineQueryHandler, ConversationHandler
 
-from sp_bot import application, TEMP_CHANNEL
+from sp_bot import application, TEMP_CHANNEL, LOGGER
 from sp_bot.modules.misc.cook_image import drawImage
 from sp_bot.modules.db import DATABASE
 from sp_bot.modules.misc.request_spotify import SPOTIFY
@@ -15,7 +15,7 @@ async def inlineNowPlaying(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         tg_id = str(update.inline_query.from_user.id)
         is_user = DATABASE.fetchData(tg_id)
-        if is_user == None:
+        if is_user is None:
             await update.inline_query.answer(
                 [], switch_pm_text="You need to register first.", switch_pm_parameter='register', cache_time=0)
             return ConversationHandler.END
@@ -29,16 +29,17 @@ async def inlineNowPlaying(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return ConversationHandler.END
         else:
             token = is_user["token"]
-            r = SPOTIFY.getCurrentyPlayingSong(token)
+            r = await SPOTIFY.getCurrentyPlayingSong(token)
     except Exception as ex:
-        print(ex)
+        LOGGER.exception(ex)
         return
 
     try:
         user_profile_photos = await context.bot.get_user_profile_photos(tg_id, limit=1)
         if user_profile_photos.photos:
             pfp_file = await context.bot.get_file(user_profile_photos.photos[0][0].file_id)
-            pfp = requests.get(pfp_file.file_path)
+            async with httpx.AsyncClient(follow_redirects=True) as client:
+                pfp = await client.get(pfp_file.file_path)
         else:
             pfp = None
     except:
@@ -52,7 +53,7 @@ async def inlineNowPlaying(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif res['currently_playing_type'] == 'track':
             username = is_user["username"]
             style = is_user["style"]
-            image = drawImage(res, username, pfp, style)
+            image = await drawImage(res, username, pfp, style)
             button = InlineKeyboardButton(
                 text="Play on Spotify", url=res['item']['external_urls']['spotify'])
             temp = await context.bot.send_photo(TEMP_CHANNEL, photo=image)
@@ -72,7 +73,7 @@ async def inlineNowPlaying(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.inline_query.answer(
                 [], switch_pm_text="Not sure what you're listening to.", switch_pm_parameter='notsure', cache_time=0)
     except Exception as ex:
-        print(ex)
+        LOGGER.exception(ex)
         await update.inline_query.answer([], switch_pm_text="You're not listening to anything.",
                                    switch_pm_parameter='notlistening', cache_time=0)
 

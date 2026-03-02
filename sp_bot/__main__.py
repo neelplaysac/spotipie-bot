@@ -1,4 +1,6 @@
 import re
+import html
+import traceback
 import importlib
 from bson.objectid import ObjectId
 
@@ -72,7 +74,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.effective_message.text
         if len(text) <= 10:
             await update.effective_message.reply_text(
-                START_TEXT.format(first_name), parse_mode=ParseMode.MARKDOWN)
+                START_TEXT.format(first_name))
         elif text.endswith('register'):
             await update.message.reply_text(
                 "To register your account use /register command.")
@@ -111,12 +113,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 try:
                     tg_id = str(update.effective_user.id)
                     is_user = DATABASE.fetchData(tg_id)
-                    if is_user != None:
+                    if is_user is not None:
                         await update.message.reply_text(
                             "You are already registered. If the bot is not working /unregister and /register again.")
                         return ConversationHandler.END
                     authcode = codeObject["authCode"]
-                    refreshToken = SPOTIFY.getAccessToken(authcode)
+                    refreshToken = await SPOTIFY.getAccessToken(authcode)
                     if refreshToken == 'error':
                         await update.message.reply_text(
                             "Unable to authenticate. Please try again using /register. If you are having issues using the bot contact in support chat (check bot info)")
@@ -149,25 +151,39 @@ async def get_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     else:
         await update.effective_message.reply_text(
-            HELP_TEXT, parse_mode=ParseMode.MARKDOWN)
+            HELP_TEXT)
+
+
+# global error handler
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log errors caused by updates and notify the user."""
+    LOGGER.error("Exception while handling an update:", exc_info=context.error)
+
+    # notify user that something went wrong
+    if isinstance(update, Update) and update.effective_message:
+        try:
+            await update.effective_message.reply_text(
+                "Something went wrong. Please try again later.")
+        except Exception:
+            pass
 
 
 # main
 def main():
-    LOGGER.info("🤖 Starting Spotipie Bot...")
+    LOGGER.info("Starting Spotipie Bot...")
 
     start_handler = CommandHandler("start", start)
     help_handler = CommandHandler("help", get_help)
 
     application.add_handler(start_handler)
     application.add_handler(help_handler)
+    application.add_error_handler(error_handler)
 
     try:
-        LOGGER.info("🎯 Starting Telegram bot polling...")
+        LOGGER.info("Starting Telegram bot polling...")
         application.run_polling()
     finally:
-        # Stop the OAuth server when shutting down
-        LOGGER.info("🛑 Shutting down OAuth callback server...")
+        LOGGER.info("Shutting down...")
 
 
 if __name__ == '__main__':

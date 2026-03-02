@@ -1,7 +1,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, ConversationHandler
 
-from sp_bot import application
+from sp_bot import application, LOGGER
 from sp_bot.modules.db import DATABASE
 from sp_bot.modules.misc.request_spotify import SPOTIFY
 from sp_bot.modules.misc.cooldown import cooldown
@@ -38,7 +38,7 @@ async def unRegister(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         tg_id = str(update.effective_user.id)
         try:
             is_user = DATABASE.fetchData(tg_id)
-            if is_user == None:
+            if is_user is None:
                 await update.message.reply_text(
                     "You haven't registered your account yet.")
                 return ConversationHandler.END
@@ -48,7 +48,7 @@ async def unRegister(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 return ConversationHandler.END
 
         except Exception as ex:
-            print(ex)
+            LOGGER.exception(ex)
             await update.effective_message.reply_text("Database Error.")
             return ConversationHandler.END
     else:

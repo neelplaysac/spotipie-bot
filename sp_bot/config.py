@@ -17,3 +17,4 @@ class Config:
     TEMP_CHANNEL = os.getenv('TEMP_CHANNEL')
     REDIRECT_URI = os.getenv('REDIRECT_URI')
     LASTFM_API_KEY = os.getenv('LASTFM_API_KEY')
+    ADMIN_IDS = [x.strip() for x in os.getenv('ADMIN_IDS', '').split(',') if x.strip()]

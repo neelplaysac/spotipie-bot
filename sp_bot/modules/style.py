@@ -20,18 +20,18 @@ async def style(update: Update, context: ContextTypes.DEFAULT_TYPE):
             is_user = DATABASE.fetchData(tg_id)
             lastfm_user = DATABASE.getLastFmUser(tg_id)
 
-            if is_user == None and lastfm_user == None:
+            if is_user is None and lastfm_user is None:
                 await update.message.reply_text(REG_MSG)
                 return ConversationHandler.END
 
             keyboard = [[]]
 
-            if is_user != None:
+            if is_user is not None:
                 curr_style = "Blur" if is_user["style"] == "blur" else "Black"
                 keyboard[0].append(InlineKeyboardButton(
                     f"Current Style: {curr_style}", callback_data=curr_style))
 
-            if lastfm_user != None:
+            if lastfm_user is not None:
                 if "counter" not in lastfm_user:
                     DATABASE.toggleCounter(tg_id, "on")
                     lastfm_user["counter"] = "on"

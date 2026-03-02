@@ -1,4 +1,4 @@
-import requests
+import httpx
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import CommandHandler, ContextTypes, ConversationHandler
@@ -25,7 +25,7 @@ async def nowLastFm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         tg_id = str(update.message.from_user.id)
         is_user = DATABASE.getLastFmUser(tg_id)
-        if is_user == None:
+        if is_user is None:
             if update.effective_chat.type == "private":
                 await update.effective_message.reply_text(
                     "Use /linkfm command to link your lastfm account first.")
@@ -50,7 +50,7 @@ async def nowLastFm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
         else:
             last_fm_username = is_user['fm_username']
-            r = getLastFmStatus(last_fm_username)
+            r = await getLastFmStatus(last_fm_username)
 
     except Exception as ex:
         LOGGER.exception(ex)
@@ -62,7 +62,8 @@ async def nowLastFm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if pfp_url.photos:
             file_id = pfp_url.photos[0][0].file_id
             file_obj = await context.bot.get_file(file_id)
-            pfp = requests.get(file_obj.file_path)
+            async with httpx.AsyncClient(follow_redirects=True) as client:
+                pfp = await client.get(file_obj.file_path)
         else:
             pfp = None
     except:
@@ -82,10 +83,10 @@ async def nowLastFm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         else:
             username = is_user["name"]
             if "counter" in is_user and is_user["counter"] == "off":
-                image = blurrImage(r, username, pfp, scrobbles="off")
+                image = await blurrImage(r, username, pfp, scrobbles="off")
             else:
-                scrobbles = getScrobbles(r, last_fm_username)
-                image = blurrImage(r, username, pfp, scrobbles)
+                scrobbles = await getScrobbles(r, last_fm_username)
+                image = await blurrImage(r, username, pfp, scrobbles)
             button = InlineKeyboardButton(
                 text="LastFm Song Link", url=r.json()['recenttracks']['track'][0]['url'])
 
@@ -97,23 +98,24 @@ async def nowLastFm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text("Unable to get data from LastFm.")
 
 
-def getLastFmStatus(fm_username):
+async def getLastFmStatus(fm_username):
     METHOD = 'method=user.getrecenttracks'
-    r = requests.get(
-        f"{SCROBBLER_URL}?{METHOD}&limit=1&user={fm_username}&api_key={LASTKEY}&format=json")
+    async with httpx.AsyncClient() as client:
+        r = await client.get(
+            f"{SCROBBLER_URL}?{METHOD}&limit=1&user={fm_username}&api_key={LASTKEY}&format=json")
     return r
 
 
-def getScrobbles(res, user):
+async def getScrobbles(res, user):
     track = res.json()['recenttracks']['track'][0]
     artists = track['artist']['#text']
-    albumname = track['album']['#text']
     songname = track['name']
     scr = "00"
     try:
-        res = requests.get(
-            f"{SCROBBLER_URL}?method=track.getInfo&username={user}&api_key={LASTKEY}&artist={artists}&track={songname}&format=json")
-        scr = res.json()["track"]["userplaycount"]
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{SCROBBLER_URL}?method=track.getInfo&username={user}&api_key={LASTKEY}&artist={artists}&track={songname}&format=json")
+        scr = resp.json()["track"]["userplaycount"]
     except:
         pass
 

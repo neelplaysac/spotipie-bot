@@ -1,7 +1,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, ConversationHandler, MessageHandler, filters
 
-from sp_bot import application
+from sp_bot import application, LOGGER
 from sp_bot.modules.db import DATABASE
 from sp_bot.modules.misc.cooldown import cooldown
 
@@ -30,20 +30,16 @@ async def getUsername(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def setUsername(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     'save username in db'
     text = update.effective_message.text.strip()
-    if len(text) > 15:
+    if not text or len(text) > 15 or text.startswith('/'):
         await update.message.reply_text(
-            "Invalid username. Try again using /name ")
-        return ConversationHandler.END
-    elif text.startswith('/'):
-        await update.message.reply_text(
-            "Invalid username. Try again using /name ")
+            "Invalid username. Must be 1-15 characters and not start with /. Try again using /name")
         return ConversationHandler.END
     else:
         try:
             tg_id = str(update.message.from_user.id)
             is_user = DATABASE.fetchData(tg_id)
 
-            if is_user == None:
+            if is_user is None:
                 await update.message.reply_text(REG_MSG)
                 return ConversationHandler.END
             else:
@@ -52,7 +48,7 @@ async def setUsername(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 return ConversationHandler.END
 
         except Exception as ex:
-            print(ex)
+            LOGGER.exception(ex)
             await update.message.reply_text("Database Error")
             return ConversationHandler.END
 
@@ -67,6 +63,7 @@ USERNAME_HANDLER = ConversationHandler(
     entry_points=[CommandHandler('name', getUsername)],
     states={USERNAME: [MessageHandler(
             filters.TEXT & ~filters.COMMAND, setUsername)]},
-    fallbacks=[CommandHandler('cancel', cancel)])
+    fallbacks=[CommandHandler('cancel', cancel)],
+    conversation_timeout=60)
 
 application.add_handler(USERNAME_HANDLER)

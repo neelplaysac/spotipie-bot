@@ -29,13 +29,9 @@ async def getLastFmUserName(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 async def linkLastFmUser(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     'save username in db'
     text = update.effective_message.text.strip()
-    if len(text) > 25:
+    if not text or len(text) > 15 or text.startswith('/') or not all(c.isalnum() or c in '-_' for c in text):
         await update.message.reply_text(
-            "Invalid username. Try again using /linkfm ")
-        return ConversationHandler.END
-    elif text.startswith('/'):
-        await update.message.reply_text(
-            "Invalid username. Try again using /linkfm ")
+            "Invalid LastFm username. Must be 1-15 alphanumeric characters (hyphens and underscores allowed). Try again using /linkfm")
         return ConversationHandler.END
     else:
         try:
@@ -70,7 +66,7 @@ async def unLinkFm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         tg_id = str(update.effective_user.id)
         try:
             is_user = DATABASE.getLastFmUser(tg_id)
-            if is_user == None:
+            if is_user is None:
                 await update.message.reply_text(
                     "You haven't registered your account yet.")
                 return ConversationHandler.END
@@ -97,7 +93,8 @@ LASTFM_HANDLER = ConversationHandler(
     entry_points=[CommandHandler('linkfm', getLastFmUserName)],
     states={LASTFM_USERNAME: [MessageHandler(
             filters.TEXT & ~filters.COMMAND, linkLastFmUser)]},
-    fallbacks=[CommandHandler('cancel', cancel)])
+    fallbacks=[CommandHandler('cancel', cancel)],
+    conversation_timeout=60)
 
 UNLINKFM_HANDLER = CommandHandler("unlinkfm", unLinkFm)
 

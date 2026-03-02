@@ -1,10 +1,10 @@
-import requests
+import httpx
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import CommandHandler, ContextTypes, ConversationHandler
 from telegram.constants import ChatAction
 
-from sp_bot import application
+from sp_bot import application, LOGGER
 from sp_bot.modules.misc.cook_image import drawImage
 from sp_bot.modules.db import DATABASE
 from sp_bot.modules.misc.request_spotify import SPOTIFY
@@ -27,7 +27,7 @@ async def nowPlaying(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     try:
         tg_id = str(update.message.from_user.id)
         is_user = DATABASE.fetchData(tg_id)
-        if is_user == None:
+        if is_user is None:
             button = InlineKeyboardMarkup(
                 [[InlineKeyboardButton(text='Contact in pm', url=BOT_URL.format(context.bot.username))]])
             await update.effective_message.reply_text(REG_MSG, reply_markup=button)
@@ -47,17 +47,18 @@ async def nowPlaying(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             
         else:
             token = is_user["token"]
-            r = SPOTIFY.getCurrentyPlayingSong(token)
+            r = await SPOTIFY.getCurrentyPlayingSong(token)
 
     except Exception as ex:
-        print(ex)
+        LOGGER.exception(ex)
         return
 
     try:
         user_profile_photos = await context.bot.get_user_profile_photos(tg_id, limit=1)
         if user_profile_photos.photos:
             pfp_file = await context.bot.get_file(user_profile_photos.photos[0][0].file_id)
-            pfp = requests.get(pfp_file.file_path)
+            async with httpx.AsyncClient(follow_redirects=True) as client:
+                pfp = await client.get(pfp_file.file_path)
         else:
             pfp = None
     except:
@@ -72,7 +73,7 @@ async def nowPlaying(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         elif res['currently_playing_type'] == 'track':
             username = is_user["username"]
             style = is_user["style"]
-            image = drawImage(res, username, pfp, style)
+            image = await drawImage(res, username, pfp, style)
             button = InlineKeyboardButton(
                 text="Play on Spotify", url=res['item']['external_urls']['spotify'])
 
@@ -83,7 +84,7 @@ async def nowPlaying(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             response = "Not sure what you're listening to."
             await update.message.reply_text(response)
     except Exception as ex:
-        print(ex)
+        LOGGER.exception(ex)
         await update.message.reply_text("You are not listening to anything.")
 
 

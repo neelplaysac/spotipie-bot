@@ -1,5 +1,5 @@
 import math
-import requests
+import httpx
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 from io import BytesIO
 
@@ -36,7 +36,7 @@ def checkUnicode(text):
     return text == str(text.encode('utf-8'))[2:-1]
 
 
-def blurrImage(res, username, pfp, scrobbles):
+async def blurrImage(res, username, pfp, scrobbles):
     last_fm_temp_image = 'https://lastfm.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png'
     last_fm_logo = 'https://files.catbox.moe/098341.png'
     # last_fm_logo = 'https://files.catbox.moe/ymirt1.png'
@@ -64,7 +64,8 @@ def blurrImage(res, username, pfp, scrobbles):
     # album art
     try:
         link = coverart
-        r = requests.get(link)
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            r = await client.get(link)
         art = Image.open(BytesIO(r.content))
         art.thumbnail((200, 200), Image.Resampling.LANCZOS)
 
