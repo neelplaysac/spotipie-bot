@@ -1,7 +1,7 @@
 import httpx
 from uuid import uuid4
 
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, InlineQueryResultCachedPhoto
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, InlineQueryResultCachedPhoto, InlineQueryResultsButton
 from telegram.ext import ContextTypes, InlineQueryHandler, ConversationHandler
 
 from sp_bot import application, TEMP_CHANNEL, LOGGER
@@ -17,15 +17,15 @@ async def inlineNowPlaying(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_user = DATABASE.fetchData(tg_id)
         if is_user is None:
             await update.inline_query.answer(
-                [], switch_pm_text="You need to register first.", switch_pm_parameter='register', cache_time=0)
+                [], button=InlineQueryResultsButton(text="You need to register first.", start_parameter='register'), cache_time=0)
             return ConversationHandler.END
         elif is_user["username"] == 'User':
             await update.inline_query.answer(
-                [], switch_pm_text="You need to set a username.", switch_pm_parameter='username', cache_time=0)
+                [], button=InlineQueryResultsButton(text="You need to set a username.", start_parameter='username'), cache_time=0)
             return ConversationHandler.END
         elif is_user['token'] == '00000':
             await update.inline_query.answer(
-                [], switch_pm_text="Registration error, please click here to fix.", switch_pm_parameter='token', cache_time=0)
+                [], button=InlineQueryResultsButton(text="Registration error, please click here to fix.", start_parameter='token'), cache_time=0)
             return ConversationHandler.END
         else:
             token = is_user["token"]
@@ -48,13 +48,13 @@ async def inlineNowPlaying(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if r.status_code == 204 or not r.content:
             await update.inline_query.answer(
-                [], switch_pm_text="You're not listening to anything.", switch_pm_parameter='notlistening', cache_time=0)
+                [], button=InlineQueryResultsButton(text="You're not listening to anything.", start_parameter='notlistening'), cache_time=0)
             return
 
         res = r.json()
         if res['currently_playing_type'] == 'ad':
             await update.inline_query.answer(
-                [], switch_pm_text="You are listening to ads.", switch_pm_parameter='ads', cache_time=0)
+                [], button=InlineQueryResultsButton(text="You are listening to ads.", start_parameter='ads'), cache_time=0)
         elif res['currently_playing_type'] == 'track':
             username = is_user["username"]
             style = is_user["style"]
@@ -76,11 +76,11 @@ async def inlineNowPlaying(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         else:
             await update.inline_query.answer(
-                [], switch_pm_text="Not sure what you're listening to.", switch_pm_parameter='notsure', cache_time=0)
+                [], button=InlineQueryResultsButton(text="Not sure what you're listening to.", start_parameter='notsure'), cache_time=0)
     except Exception as ex:
         LOGGER.exception(ex)
-        await update.inline_query.answer([], switch_pm_text="You're not listening to anything.",
-                                   switch_pm_parameter='notlistening', cache_time=0)
+        await update.inline_query.answer(
+            [], button=InlineQueryResultsButton(text="You're not listening to anything.", start_parameter='notlistening'), cache_time=0)
 
 
 INLINE_QUERY_HANDLER = InlineQueryHandler(inlineNowPlaying)
