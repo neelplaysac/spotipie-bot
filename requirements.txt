@@ -1,4 +1,4 @@
-python-telegram-bot==20.7
+python-telegram-bot[job-queue]==20.7
 httpx>=0.25.0
 Pillow>=10.0.0
 pymongo>=4.5.0

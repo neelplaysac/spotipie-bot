@@ -46,6 +46,11 @@ async def inlineNowPlaying(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pfp = None
 
     try:
+        if r.status_code == 204 or not r.content:
+            await update.inline_query.answer(
+                [], switch_pm_text="You're not listening to anything.", switch_pm_parameter='notlistening', cache_time=0)
+            return
+
         res = r.json()
         if res['currently_playing_type'] == 'ad':
             await update.inline_query.answer(

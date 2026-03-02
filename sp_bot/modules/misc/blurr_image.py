@@ -142,7 +142,7 @@ async def blurrImage(res, username, pfp, scrobbles):
               fill=white, font=artistfont)
     draw.text((248, 170), truncate(albumname, albumfont, 315),
               fill=white, font=albumfont)
-    draw.rectangle([(578, 221), (248, 223)], fill='#B3B3B3')
+    draw.rectangle([(248, 221), (578, 223)], fill='#B3B3B3')
 
     if scrobbles != "off":
         w = {1: 45, 2: 58, 3: 73, 4: 86, 5: 100, 6: 111}[len(scrobbles)]

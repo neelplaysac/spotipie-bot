@@ -65,6 +65,10 @@ async def nowPlaying(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         pfp = None
 
     try:
+        if r.status_code == 204 or not r.content:
+            await update.message.reply_text("You are not listening to anything.")
+            return
+
         res = r.json()
         if res['currently_playing_type'] == 'ad':
             response = "You're listening to ads."
