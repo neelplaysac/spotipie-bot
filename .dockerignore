@@ -1,0 +1,34 @@
+# Version control
+.git
+.gitignore
+
+# Secrets / local environment (values are injected at runtime)
+.env
+.env.*
+!.env.example
+
+# Pre-built binaries and build output
+spotipie-go
+bin/
+dist/
+*.exe
+
+# Logs
+*.log
+
+# Tests and docs not needed to build the image
+*_test.go
+README.md
+*.md
+
+# Editor / OS cruft
+.vscode/
+.idea/
+.DS_Store
+
+# Container files themselves
+Dockerfile
+Dockerfile.*
+docker-compose.yml
+docker-compose.*.yml
+.dockerignore

@@ -1,0 +1,50 @@
+services:
+  spotipie:
+    # Pull the pre-built image from the GitHub Container Registry (GHCR).
+    # The image is built and pushed by .github/workflows/docker.yml. Tag
+    # :latest always points at the newest default-branch build. GHCR paths
+    # must be lowercase.
+    image: ghcr.io/neelplaysac/spotipie-go:latest
+    container_name: spotipie-go
+
+    # Always re-pull :latest on (re)deploy so Portainer picks up new builds.
+    pull_policy: always
+
+    # NOTE (Portainer): the GHCR package is private by default. Either make it
+    # public (Package settings > Change visibility) or add a GitHub PAT with
+    # read:packages scope under Portainer > Registries -> ghcr.io so this
+    # stack can pull the image.
+
+    # Secrets/config come from a .env file next to this compose file.
+    # In Portainer, add the variables under Stack > Environment variables;
+    # Portainer writes them to a .env file in the stack directory, which is
+    # exactly what env_file below reads. See .env.example for the keys.
+    env_file:
+      - .env
+
+    # Non-secret defaults can be overridden here / from Portainer UI vars.
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+
+    # The bot uses Telegram long polling, so there are no ports to publish.
+    # MongoDB is the managed Atlas cluster configured in the env vars, so no
+    # local database service is required.
+
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+
+    # Hardening: no privilege escalation, read-only root filesystem with a
+    # writable /tmp. Remove read_only/tmpfs if a future build needs disk writes.
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
