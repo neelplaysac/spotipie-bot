@@ -123,7 +123,7 @@ func (s *SpotifyClient) GetCurrentlyPlaying(ctx context.Context, refreshToken st
 
 	treq, err := http.NewRequestWithContext(ctx, http.MethodPost, spotifyTokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
-		logger.Error("spotify token refresh failed", "err", err)
+		logger.ErrorContext(ctx, "spotify token refresh failed", "err", err)
 		return nil, err
 	}
 	treq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -135,7 +135,7 @@ func (s *SpotifyClient) GetCurrentlyPlaying(ctx context.Context, refreshToken st
 		if errors.As(err, &urlErr) {
 			err = urlErr.Err
 		}
-		logger.Error("spotify token refresh failed", "err", err)
+		logger.ErrorContext(ctx, "spotify token refresh failed", "err", err)
 		return nil, err
 	}
 
@@ -145,12 +145,12 @@ func (s *SpotifyClient) GetCurrentlyPlaying(ctx context.Context, refreshToken st
 	decodeErr := json.NewDecoder(tresp.Body).Decode(&token)
 	tresp.Body.Close()
 	if decodeErr != nil {
-		logger.Error("spotify token refresh failed", "err", decodeErr)
+		logger.ErrorContext(ctx, "spotify token refresh failed", "err", decodeErr)
 		return nil, decodeErr
 	}
 	if token.AccessToken == "" {
 		err := fmt.Errorf("spotify: no access_token in refresh response")
-		logger.Error("spotify token refresh failed", "err", err)
+		logger.ErrorContext(ctx, "spotify token refresh failed", "err", err)
 		return nil, err
 	}
 

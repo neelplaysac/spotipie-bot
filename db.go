@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -67,7 +68,10 @@ func newDatabase(cfg *Config) (*Database, error) {
 }
 
 func (d *Database) Close() {
-	if err := d.client.Disconnect(context.Background()); err != nil {
+	// Leave time for Sentry to flush inside the container's 30s stop window.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := d.client.Disconnect(ctx); err != nil {
 		logger.Error("mongo disconnect failed", "err", err)
 	}
 }

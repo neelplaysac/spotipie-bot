@@ -24,6 +24,11 @@ type Config struct {
 	RedirectURI         string
 	LastFMAPIKey        string
 	AdminIDs            map[string]bool
+
+	SentryDSN              string
+	SentryEnvironment      string
+	SentryRelease          string
+	SentryTracesSampleRate string
 }
 
 func loadConfig() *Config {
@@ -41,6 +46,11 @@ func loadConfig() *Config {
 		RedirectURI:         os.Getenv("REDIRECT_URI"),
 		LastFMAPIKey:        os.Getenv("LASTFM_API_KEY"),
 		AdminIDs:            map[string]bool{},
+
+		SentryDSN:              strings.TrimSpace(os.Getenv("SENTRY_DSN")),
+		SentryEnvironment:      envOr("SENTRY_ENVIRONMENT", "production"),
+		SentryRelease:          os.Getenv("SENTRY_RELEASE"),
+		SentryTracesSampleRate: envOr("SENTRY_TRACES_SAMPLE_RATE", "0.01"),
 	}
 
 	for _, id := range strings.Split(os.Getenv("ADMIN_IDS"), ",") {

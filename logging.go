@@ -52,6 +52,10 @@ func logDuration(start time.Time) slog.Attr {
 }
 
 func init() {
+	configureLogging()
+}
+
+func configureLogging() {
 	switch strings.ToLower(os.Getenv("LOG_LEVEL")) {
 	case "debug":
 		logLevel.Set(slog.LevelDebug)

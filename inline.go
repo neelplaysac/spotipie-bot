@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -20,7 +19,7 @@ func randID() string {
 
 // answerInlineError replies to an inline query with no results and a guidance button.
 func answerInlineError(b *gotgbot.Bot, c *ext.Context, text, startParam string) error {
-	ctx := context.Background()
+	ctx := updateContext(c)
 	cache := int64(0)
 	_, err := b.AnswerInlineQueryWithContext(ctx, c.InlineQuery.Id, []gotgbot.InlineQueryResult{}, &gotgbot.AnswerInlineQueryOpts{
 		CacheTime: &cache,
@@ -48,7 +47,7 @@ func parseLastFMResponse(body []byte) (*lastFMResponse, bool) {
 }
 
 func inlineNowPlaying(b *gotgbot.Bot, c *ext.Context) error {
-	ctx := context.Background()
+	ctx := updateContext(c)
 	iq := c.InlineQuery
 	if iq == nil {
 		return nil
@@ -58,7 +57,7 @@ func inlineNowPlaying(b *gotgbot.Bot, c *ext.Context) error {
 
 	user, err := db.FetchData(ctx, tgID)
 	if err != nil {
-		logger.Error("inline: db fetch failed", "err", err, "user_id", iq.From.Id)
+		logger.ErrorContext(ctx, "inline: db fetch failed", "err", err, "user_id", iq.From.Id)
 		return nil
 	}
 
@@ -74,7 +73,7 @@ func inlineNowPlaying(b *gotgbot.Bot, c *ext.Context) error {
 
 	cp, err := spotifyClient.GetCurrentlyPlaying(ctx, user.Token)
 	if err != nil {
-		logger.Error("inline: spotify request failed", "err", err, "user_id", iq.From.Id)
+		logger.ErrorContext(ctx, "inline: spotify request failed", "err", err, "user_id", iq.From.Id)
 		return nil
 	}
 
@@ -99,7 +98,7 @@ func inlineNowPlaying(b *gotgbot.Bot, c *ext.Context) error {
 
 		img, err := drawImage(res, user.Username, pfp, user.Style)
 		if err != nil {
-			logger.Error("inline: image gen failed", "err", err, "user_id", iq.From.Id)
+			logger.ErrorContext(ctx, "inline: image gen failed", "err", err, "user_id", iq.From.Id)
 			return answerInlineError(b, c, "You're not listening to anything.", "notlistening")
 		}
 
@@ -109,7 +108,7 @@ func inlineNowPlaying(b *gotgbot.Bot, c *ext.Context) error {
 
 		temp, err := b.SendPhotoWithContext(ctx, cfgConfig.TempChannel, gotgbot.InputFileByReader("now.jpg", strings.NewReader(string(img))), nil)
 		if err != nil {
-			logger.Error("inline: temp channel send failed", "err", err, "user_id", iq.From.Id)
+			logger.ErrorContext(ctx, "inline: temp channel send failed", "err", err, "user_id", iq.From.Id)
 			return answerInlineError(b, c, "You're not listening to anything.", "notlistening")
 		}
 
@@ -128,7 +127,7 @@ func inlineNowPlaying(b *gotgbot.Bot, c *ext.Context) error {
 			},
 		}, &gotgbot.AnswerInlineQueryOpts{CacheTime: &cache})
 		if err != nil {
-			logger.Error("inline: answer failed", "err", err, "user_id", iq.From.Id)
+			logger.ErrorContext(ctx, "inline: answer failed", "err", err, "user_id", iq.From.Id)
 		}
 		return nil
 	default:

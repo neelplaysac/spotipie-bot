@@ -6,6 +6,7 @@ require (
 	github.com/PaulSonOfLars/gotgbot/v2 v2.0.0-rc.36
 	github.com/disintegration/imaging v1.6.2
 	github.com/fogleman/gg v1.3.0
+	github.com/getsentry/sentry-go v0.50.0
 	github.com/joho/godotenv v1.5.1
 	go.mongodb.org/mongo-driver/v2 v2.9.1
 	golang.org/x/image v0.46.0

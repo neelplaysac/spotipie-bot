@@ -158,7 +158,7 @@ func fetchProfilePic(b *gotgbot.Bot, ctx context.Context, userID int64) []byte {
 // ---------- /start ----------
 
 func startHandler(b *gotgbot.Bot, c *ext.Context) error {
-	ctx := context.Background()
+	ctx := updateContext(c)
 	update := c.Update
 	msg := update.Message
 	if msg == nil {
@@ -248,7 +248,7 @@ func startHandler(b *gotgbot.Bot, c *ext.Context) error {
 // ---------- /help ----------
 
 func helpHandler(b *gotgbot.Bot, c *ext.Context) error {
-	ctx := context.Background()
+	ctx := updateContext(c)
 	msg := c.Update.Message
 	if msg == nil {
 		return nil
@@ -267,7 +267,7 @@ func helpHandler(b *gotgbot.Bot, c *ext.Context) error {
 // ---------- /register /unregister ----------
 
 func registerHandler(b *gotgbot.Bot, c *ext.Context) error {
-	ctx := context.Background()
+	ctx := updateContext(c)
 	msg := c.Update.Message
 	if msg == nil || c.EffectiveUser == nil {
 		return nil
@@ -294,7 +294,7 @@ func registerHandler(b *gotgbot.Bot, c *ext.Context) error {
 }
 
 func unregisterHandler(b *gotgbot.Bot, c *ext.Context) error {
-	ctx := context.Background()
+	ctx := updateContext(c)
 	msg := c.Update.Message
 	if msg == nil || c.EffectiveUser == nil {
 		return nil
@@ -330,7 +330,7 @@ func unregisterHandler(b *gotgbot.Bot, c *ext.Context) error {
 const nameState = "NAME"
 
 func getName(b *gotgbot.Bot, c *ext.Context) error {
-	ctx := context.Background()
+	ctx := updateContext(c)
 	msg := c.Update.Message
 	if msg == nil {
 		return nil
@@ -348,7 +348,7 @@ func getName(b *gotgbot.Bot, c *ext.Context) error {
 }
 
 func setName(b *gotgbot.Bot, c *ext.Context) error {
-	ctx := context.Background()
+	ctx := updateContext(c)
 	msg := c.Update.Message
 	tgID := strconv.FormatInt(c.EffectiveUser.Id, 10)
 
@@ -380,7 +380,7 @@ func setName(b *gotgbot.Bot, c *ext.Context) error {
 // ---------- /now ----------
 
 func nowHandler(b *gotgbot.Bot, c *ext.Context) error {
-	ctx := context.Background()
+	ctx := updateContext(c)
 	update := c.Update
 	msg := update.Message
 	if msg == nil || c.EffectiveUser == nil {
@@ -398,7 +398,7 @@ func nowHandler(b *gotgbot.Bot, c *ext.Context) error {
 	tgID := strconv.FormatInt(c.EffectiveUser.Id, 10)
 	user, err := db.FetchData(ctx, tgID)
 	if err != nil {
-		logger.Error("now: db fetch failed", "err", err, "user_id", tgID, "chat_id", msg.Chat.Id)
+		logger.ErrorContext(ctx, "now: db fetch failed", "err", err, "user_id", tgID, "chat_id", msg.Chat.Id)
 		return nil
 	}
 	if user == nil {
@@ -413,7 +413,7 @@ func nowHandler(b *gotgbot.Bot, c *ext.Context) error {
 
 	cp, err := spotifyClient.GetCurrentlyPlaying(ctx, user.Token)
 	if err != nil {
-		logger.Error("now: spotify request failed", "err", err, "user_id", tgID, "chat_id", msg.Chat.Id)
+		logger.ErrorContext(ctx, "now: spotify request failed", "err", err, "user_id", tgID, "chat_id", msg.Chat.Id)
 		return nil
 	}
 
@@ -437,7 +437,7 @@ func nowHandler(b *gotgbot.Bot, c *ext.Context) error {
 		}
 		img, err := drawImage(res, user.Username, pfp, user.Style)
 		if err != nil {
-			logger.Error("now: image gen failed", "err", err, "user_id", tgID, "chat_id", msg.Chat.Id)
+			logger.ErrorContext(ctx, "now: image gen failed", "err", err, "user_id", tgID, "chat_id", msg.Chat.Id)
 			return sendText(b, ctx, msg.Chat.Id, "You are not listening to anything.", nil)
 		}
 
@@ -446,7 +446,7 @@ func nowHandler(b *gotgbot.Bot, c *ext.Context) error {
 		})
 		_, err = b.SendPhotoWithContext(ctx, msg.Chat.Id, gotgbot.InputFileByReader("now.jpg", strings.NewReader(string(img))), &gotgbot.SendPhotoOpts{ReplyMarkup: markup})
 		if err != nil {
-			logger.Error("now: photo send failed", "err", err, "user_id", tgID, "chat_id", msg.Chat.Id)
+			logger.ErrorContext(ctx, "now: photo send failed", "err", err, "user_id", tgID, "chat_id", msg.Chat.Id)
 		}
 		return nil
 	default:
@@ -457,7 +457,7 @@ func nowHandler(b *gotgbot.Bot, c *ext.Context) error {
 // ---------- /last ----------
 
 func lastHandler(b *gotgbot.Bot, c *ext.Context) error {
-	ctx := context.Background()
+	ctx := updateContext(c)
 	update := c.Update
 	msg := update.Message
 	if msg == nil || c.EffectiveUser == nil {
@@ -475,7 +475,7 @@ func lastHandler(b *gotgbot.Bot, c *ext.Context) error {
 	tgID := strconv.FormatInt(c.EffectiveUser.Id, 10)
 	fmUser, err := db.GetLastFMUser(ctx, tgID)
 	if err != nil {
-		logger.Error("last: db fetch failed", "err", err, "user_id", tgID, "chat_id", msg.Chat.Id)
+		logger.ErrorContext(ctx, "last: db fetch failed", "err", err, "user_id", tgID, "chat_id", msg.Chat.Id)
 		return nil
 	}
 	if fmUser == nil {
@@ -493,7 +493,7 @@ func lastHandler(b *gotgbot.Bot, c *ext.Context) error {
 
 	status, body, err := lastFMClient.GetRecentTracks(ctx, fmUser.FMUsername)
 	if err != nil {
-		logger.Error("last: lastfm request failed", "err", err, "user_id", tgID, "chat_id", msg.Chat.Id)
+		logger.ErrorContext(ctx, "last: lastfm request failed", "err", err, "user_id", tgID, "chat_id", msg.Chat.Id)
 		return nil
 	}
 
@@ -524,7 +524,7 @@ func lastHandler(b *gotgbot.Bot, c *ext.Context) error {
 
 	img, err := blurrImage(&track, username, pfp, scrobbles)
 	if err != nil {
-		logger.Error("last: image gen failed", "err", err, "user_id", tgID, "chat_id", msg.Chat.Id)
+		logger.ErrorContext(ctx, "last: image gen failed", "err", err, "user_id", tgID, "chat_id", msg.Chat.Id)
 		return sendText(b, ctx, msg.Chat.Id, "Unable to get data from LastFm.", nil)
 	}
 
@@ -533,7 +533,7 @@ func lastHandler(b *gotgbot.Bot, c *ext.Context) error {
 	})
 	_, err = b.SendPhotoWithContext(ctx, msg.Chat.Id, gotgbot.InputFileByReader("last.jpg", strings.NewReader(string(img))), &gotgbot.SendPhotoOpts{ReplyMarkup: markup})
 	if err != nil {
-		logger.Error("last: photo send failed", "err", err, "user_id", tgID, "chat_id", msg.Chat.Id)
+		logger.ErrorContext(ctx, "last: photo send failed", "err", err, "user_id", tgID, "chat_id", msg.Chat.Id)
 	}
 	return nil
 }
@@ -541,7 +541,7 @@ func lastHandler(b *gotgbot.Bot, c *ext.Context) error {
 // ---------- /style + settings callback ----------
 
 func styleHandler(b *gotgbot.Bot, c *ext.Context) error {
-	ctx := context.Background()
+	ctx := updateContext(c)
 	msg := c.Update.Message
 	if msg == nil || c.EffectiveUser == nil {
 		return nil
@@ -605,7 +605,7 @@ func styleHandler(b *gotgbot.Bot, c *ext.Context) error {
 }
 
 func styleButton(b *gotgbot.Bot, c *ext.Context) error {
-	ctx := context.Background()
+	ctx := updateContext(c)
 	cq := c.CallbackQuery
 	if cq == nil {
 		return nil
@@ -653,7 +653,7 @@ func styleButton(b *gotgbot.Bot, c *ext.Context) error {
 		if c.EffectiveChat != nil {
 			chatID = c.EffectiveChat.Id
 		}
-		logger.Error("style: edit failed", "err", err, "user_id", cq.From.Id, "chat_id", chatID)
+		logger.ErrorContext(ctx, "style: edit failed", "err", err, "user_id", cq.From.Id, "chat_id", chatID)
 	}
 	return nil
 }
@@ -663,7 +663,7 @@ func styleButton(b *gotgbot.Bot, c *ext.Context) error {
 const linkFMState = "LINKFM"
 
 func getLastFMUserName(b *gotgbot.Bot, c *ext.Context) error {
-	ctx := context.Background()
+	ctx := updateContext(c)
 	msg := c.Update.Message
 	if msg == nil {
 		return nil
@@ -681,7 +681,7 @@ func getLastFMUserName(b *gotgbot.Bot, c *ext.Context) error {
 }
 
 func linkLastFMUser(b *gotgbot.Bot, c *ext.Context) error {
-	ctx := context.Background()
+	ctx := updateContext(c)
 	msg := c.Update.Message
 	tgID := strconv.FormatInt(c.EffectiveUser.Id, 10)
 
@@ -720,7 +720,7 @@ func validFmUsername(text string) bool {
 }
 
 func unlinkfmHandler(b *gotgbot.Bot, c *ext.Context) error {
-	ctx := context.Background()
+	ctx := updateContext(c)
 	msg := c.Update.Message
 	if msg == nil || c.EffectiveUser == nil {
 		return nil
@@ -756,7 +756,7 @@ func unlinkfmHandler(b *gotgbot.Bot, c *ext.Context) error {
 const nameFMState = "NAMEFM"
 
 func getLastFMUserData(b *gotgbot.Bot, c *ext.Context) error {
-	ctx := context.Background()
+	ctx := updateContext(c)
 	msg := c.Update.Message
 	if msg == nil {
 		return nil
@@ -774,7 +774,7 @@ func getLastFMUserData(b *gotgbot.Bot, c *ext.Context) error {
 }
 
 func setLastFMUserData(b *gotgbot.Bot, c *ext.Context) error {
-	ctx := context.Background()
+	ctx := updateContext(c)
 	msg := c.Update.Message
 	tgID := strconv.FormatInt(c.EffectiveUser.Id, 10)
 
@@ -806,7 +806,7 @@ func setLastFMUserData(b *gotgbot.Bot, c *ext.Context) error {
 // ---------- /statss /details (admin only) ----------
 
 func statssHandler(b *gotgbot.Bot, c *ext.Context) error {
-	ctx := context.Background()
+	ctx := updateContext(c)
 	msg := c.Update.Message
 	if msg == nil || c.EffectiveUser == nil {
 		return nil
@@ -825,7 +825,7 @@ func statssHandler(b *gotgbot.Bot, c *ext.Context) error {
 }
 
 func detailsHandler(b *gotgbot.Bot, c *ext.Context) error {
-	ctx := context.Background()
+	ctx := updateContext(c)
 	msg := c.Update.Message
 	if msg == nil || c.EffectiveUser == nil {
 		return nil
@@ -887,7 +887,7 @@ func detailsHandler(b *gotgbot.Bot, c *ext.Context) error {
 // ---------- admin only? no: /cancel for conversations ----------
 
 func cancelHandler(b *gotgbot.Bot, c *ext.Context) error {
-	ctx := context.Background()
+	ctx := updateContext(c)
 	if msg := c.Update.Message; msg != nil {
 		_ = sendText(b, ctx, msg.Chat.Id, "Canceled.", nil)
 	}
