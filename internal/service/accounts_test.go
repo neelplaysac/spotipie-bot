@@ -5,10 +5,12 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 )
 
 type accountRepositoryStub struct {
 	AccountRepository
+	AuthorizationRepository
 	code  *Code
 	user  *User
 	fm    *LastFMUser
@@ -18,13 +20,9 @@ type accountRepositoryStub struct {
 	token string
 }
 
-func (r *accountRepositoryStub) FetchCode(context.Context, string) (*Code, error) {
-	r.calls = append(r.calls, "fetch-code")
+func (r *accountRepositoryStub) ConsumeAuthorization(context.Context, string, string, time.Time) (*Code, error) {
+	r.calls = append(r.calls, "consume-code")
 	return r.code, r.err
-}
-func (r *accountRepositoryStub) DeleteCode(context.Context, string) error {
-	r.calls = append(r.calls, "delete-code")
-	return nil
 }
 func (r *accountRepositoryStub) FetchData(context.Context, string) (*User, error) {
 	r.calls = append(r.calls, "fetch-user")
@@ -54,7 +52,7 @@ type authorizationStub struct {
 	code  string
 }
 
-func (s *authorizationStub) GetAuthUrl() string { return "https://example.invalid/authorize" }
+func (s *authorizationStub) AuthURL(string) string { return "https://example.invalid/authorize" }
 func (s *authorizationStub) GetAccessToken(_ context.Context, code string) (string, error) {
 	s.code = code
 	return s.token, s.err
@@ -71,15 +69,17 @@ func TestCompleteSpotifyRegistration(t *testing.T) {
 		calls  []string
 	}{
 		{"invalid code", "invalid", nil, nil, "", AccountInvalidCode, nil},
-		{"missing code", "0123456789abcdef01234567", nil, nil, "", AccountMissingCode, []string{"fetch-code", "delete-code"}},
-		{"already linked", "0123456789abcdef01234567", &Code{AuthCode: "code"}, &User{}, "", AccountAlreadyLinked, []string{"fetch-code", "delete-code", "fetch-user"}},
-		{"auth rejected", "0123456789abcdef01234567", &Code{AuthCode: "code"}, nil, "error", AccountAuthFailed, []string{"fetch-code", "delete-code", "fetch-user"}},
-		{"linked", "0123456789abcdef01234567", &Code{AuthCode: "code"}, nil, "refresh-token", AccountUpdated, []string{"fetch-code", "delete-code", "fetch-user", "add-user"}},
+		{"missing code", "0123456789abcdef01234567", nil, nil, "", AccountMissingCode, []string{"consume-code"}},
+		{"wrong owner", "0123456789abcdef01234567", &Code{AuthCode: "code", TelegramUserID: "99"}, nil, "", AccountMissingCode, []string{"consume-code"}},
+		{"already linked", "0123456789abcdef01234567", &Code{AuthCode: "code", TelegramUserID: "42"}, &User{}, "", AccountAlreadyLinked, []string{"consume-code", "fetch-user"}},
+		{"auth rejected", "0123456789abcdef01234567", &Code{AuthCode: "code", TelegramUserID: "42"}, nil, "error", AccountAuthFailed, []string{"consume-code", "fetch-user"}},
+		{"empty token", "0123456789abcdef01234567", &Code{AuthCode: "code", TelegramUserID: "42"}, nil, "", AccountAuthFailed, []string{"consume-code", "fetch-user"}},
+		{"linked", "0123456789abcdef01234567", &Code{AuthCode: "code", TelegramUserID: "42"}, nil, "refresh-token", AccountUpdated, []string{"consume-code", "fetch-user", "add-user"}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			repo := &accountRepositoryStub{code: test.code, user: test.user}
 			spotify := &authorizationStub{token: test.token}
-			status, err := NewAccounts(repo, spotify).CompleteSpotifyRegistration(context.Background(), test.codeID, "42")
+			status, err := NewAccounts(repo, spotify, NewAuthorization(repo)).CompleteSpotifyRegistration(context.Background(), test.codeID, "42")
 			if err != nil || status != test.status || !reflect.DeepEqual(repo.calls, test.calls) {
 				t.Fatalf("status=%q err=%v calls=%v; want %q %v", status, err, repo.calls, test.status, test.calls)
 			}
@@ -92,34 +92,34 @@ func TestCompleteSpotifyRegistration(t *testing.T) {
 
 func TestRegistrationPreservesCodeLookupFailure(t *testing.T) {
 	repo := &accountRepositoryStub{err: errors.New("database unavailable")}
-	status, err := NewAccounts(repo, nil).CompleteSpotifyRegistration(context.Background(), "0123456789abcdef01234567", "42")
-	if err != nil || status != AccountInvalidCode || !reflect.DeepEqual(repo.calls, []string{"fetch-code", "delete-code"}) {
-		t.Fatal("code lookup failure no longer follows the original login response")
+	status, err := NewAccounts(repo, nil, NewAuthorization(repo)).CompleteSpotifyRegistration(context.Background(), "0123456789abcdef01234567", "42")
+	if err == nil || status != "" || !reflect.DeepEqual(repo.calls, []string{"consume-code"}) {
+		t.Fatal("database failure should propagate, not masquerade as an invalid login")
 	}
 }
 
 func TestAccountValidationAndNameUpdates(t *testing.T) {
 	for _, name := range []string{"", "   ", "/command", "sixteen-chars!!!x"} {
 		repo := &accountRepositoryStub{user: &User{}}
-		status, err := NewAccounts(repo, nil).SetSpotifyName(context.Background(), "42", name)
+		status, err := NewAccounts(repo, nil, NewAuthorization(repo)).SetSpotifyName(context.Background(), "42", name)
 		if err != nil || status != AccountInvalidInput || len(repo.calls) != 0 {
 			t.Fatalf("invalid display name %q reached storage", name)
 		}
 	}
 	repo := &accountRepositoryStub{user: &User{}}
-	status, err := NewAccounts(repo, nil).SetSpotifyName(context.Background(), "42", "  नमस्ते  ")
+	status, err := NewAccounts(repo, nil, NewAuthorization(repo)).SetSpotifyName(context.Background(), "42", "  नमस्ते  ")
 	if err != nil || status != AccountUpdated || repo.name != "नमस्ते" {
 		t.Fatal("Unicode display names or whitespace trimming changed")
 	}
 	for _, name := range []string{"invalid name", "नमस्ते", "/user"} {
 		repo := &accountRepositoryStub{}
-		status, err := NewAccounts(repo, nil).LinkLastFM(context.Background(), "42", name)
+		status, err := NewAccounts(repo, nil, NewAuthorization(repo)).LinkLastFM(context.Background(), "42", name)
 		if err != nil || status != AccountInvalidInput || len(repo.calls) != 0 {
 			t.Fatalf("invalid Last.fm username %q reached storage", name)
 		}
 	}
 	repo = &accountRepositoryStub{}
-	status, err = NewAccounts(repo, nil).LinkLastFM(context.Background(), "42", " fm_user-1 ")
+	status, err = NewAccounts(repo, nil, NewAuthorization(repo)).LinkLastFM(context.Background(), "42", " fm_user-1 ")
 	if err != nil || status != AccountUpdated || repo.name != "fm_user-1" {
 		t.Fatal("Last.fm linking changed")
 	}

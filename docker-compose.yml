@@ -1,10 +1,10 @@
 services:
   spotipie:
     # Pull the pre-built image from the GitHub Container Registry (GHCR).
-    # The image is built and pushed by .github/workflows/docker.yml. Tag
+    # The image is built and pushed by .github/workflows/docker-build.yml. Tag
     # :latest always points at the newest default-branch build. GHCR paths
     # must be lowercase.
-    image: ghcr.io/neelplaysac/spotipie-go:latest
+    image: ${SPOTIPIE_IMAGE:-ghcr.io/neelplaysac/spotipie-bot:latest}
     container_name: spotipie-go
 
     # Always re-pull :latest on (re)deploy so Portainer picks up new builds.
@@ -43,6 +43,52 @@ services:
     tmpfs:
       - /tmp
 
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  authserver:
+    image: ${SPOTIPIE_IMAGE:-ghcr.io/neelplaysac/spotipie-bot:latest}
+    container_name: spotipie-authserver
+    pull_policy: always
+    entrypoint: ["/app/spotipie-authserver"]
+    # The callback server does not need Telegram or Spotify API secrets.
+    environment:
+      MONGODB_URI: ${MONGODB_URI:-}
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-}
+      MONGO_USR: ${MONGO_USR:-}
+      MONGO_PASS: ${MONGO_PASS:-}
+      MONGO_COLL: ${MONGO_COLL:-spotipie}
+      BOT_USERNAME: ${BOT_USERNAME:-spotipiebot}
+      BOT_URL: ${BOT_URL:-}
+      PORT: "6969"
+      GIN_MODE: release
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.01}
+    # Host-based reverse proxy: publish only on loopback. A proxy on the same
+    # Docker network can instead use http://authserver:6969 and omit this port.
+    ports:
+      - "127.0.0.1:${AUTH_HTTP_PORT:-6969}:6969"
+    healthcheck:
+      test: ["CMD", "/app/spotipie-authserver", "-healthcheck"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
     logging:
       driver: json-file
       options:

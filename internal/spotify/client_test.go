@@ -16,6 +16,19 @@ type fixtureTransport func(*http.Request) (*http.Response, error)
 
 func (f fixtureTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
+func TestAuthURLPreservesRedirectAndState(t *testing.T) {
+	redirect := "https://example.invalid/callback?existing=a&other=b"
+	client := New(&config.Config{SpotifyClientID: "client", RedirectURI: redirect}, slog.New(slog.DiscardHandler))
+	u, err := url.Parse(client.AuthURL("unguessable-state"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := u.Query()
+	if query.Get("redirect_uri") != redirect || query.Get("state") != "unguessable-state" || query.Get("scope") != "user-read-currently-playing" || query.Get("response_type") != "code" {
+		t.Fatalf("incorrect authorization URL: %s", u)
+	}
+}
+
 func TestPlaybackResponseBoundary(t *testing.T) {
 	for _, test := range []struct {
 		name         string

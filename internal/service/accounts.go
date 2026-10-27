@@ -31,8 +31,6 @@ type Count struct {
 }
 
 type AccountRepository interface {
-	FetchCode(context.Context, string) (*Code, error)
-	DeleteCode(context.Context, string) error
 	FetchData(context.Context, string) (*User, error)
 	AddUser(context.Context, string, string) error
 	UpdateData(context.Context, string, string) error
@@ -50,7 +48,7 @@ type AccountRepository interface {
 }
 
 type SpotifyAuthorization interface {
-	GetAuthUrl() string
+	AuthURL(state string) string
 	GetAccessToken(context.Context, string) (string, error)
 }
 
@@ -69,24 +67,30 @@ const (
 type Accounts struct {
 	repo    AccountRepository
 	spotify SpotifyAuthorization
+	auth    *Authorization
 }
 
-func NewAccounts(repo AccountRepository, spotify SpotifyAuthorization) *Accounts {
-	return &Accounts{repo: repo, spotify: spotify}
+func NewAccounts(repo AccountRepository, spotify SpotifyAuthorization, auth *Authorization) *Accounts {
+	return &Accounts{repo: repo, spotify: spotify, auth: auth}
 }
 
-func (a *Accounts) SpotifyAuthURL() string { return a.spotify.GetAuthUrl() }
+func (a *Accounts) SpotifyAuthURL(ctx context.Context, telegramID string) (string, error) {
+	state, err := a.auth.Begin(ctx, telegramID)
+	if err != nil {
+		return "", err
+	}
+	return a.spotify.AuthURL(state), nil
+}
 
 func (a *Accounts) CompleteSpotifyRegistration(ctx context.Context, id, tgID string) (AccountStatus, error) {
 	if _, err := hex.DecodeString(id); len(id) != 24 || err != nil {
 		return AccountInvalidCode, nil
 	}
-	code, err := a.repo.FetchCode(ctx, id)
-	_ = a.repo.DeleteCode(ctx, id)
+	code, err := a.auth.Consume(ctx, id, tgID)
 	if err != nil {
-		return AccountInvalidCode, nil
+		return "", err
 	}
-	if code == nil {
+	if code == nil || code.TelegramUserID != tgID {
 		return AccountMissingCode, nil
 	}
 	existing, err := a.repo.FetchData(ctx, tgID)
@@ -100,7 +104,7 @@ func (a *Accounts) CompleteSpotifyRegistration(ctx context.Context, id, tgID str
 	if err != nil {
 		return "", err
 	}
-	if token == "error" {
+	if token == "error" || token == "" {
 		return AccountAuthFailed, nil
 	}
 	if err := a.repo.AddUser(ctx, tgID, token); err != nil {

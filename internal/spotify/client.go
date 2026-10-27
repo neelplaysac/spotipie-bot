@@ -41,11 +41,15 @@ func New(cfg *config.Config, logger *slog.Logger) *Client {
 	}
 }
 
-// GetAuthUrl builds the Spotify authorization URL (same shape as the python bot:
-// the redirect_uri is concatenated raw, not query-escaped).
-func (s *Client) GetAuthUrl() string {
-	return spotifyAuthorizeURL + "?response_type=code&client_id=" + s.clientID +
-		"&redirect_uri=" + s.redirectURI + "&scope=user-read-currently-playing"
+func (s *Client) AuthURL(state string) string {
+	query := url.Values{
+		"response_type": {"code"},
+		"client_id":     {s.clientID},
+		"redirect_uri":  {s.redirectURI},
+		"scope":         {"user-read-currently-playing"},
+		"state":         {state},
+	}
+	return spotifyAuthorizeURL + "?" + query.Encode()
 }
 
 // GetAccessToken exchanges an authorization code for a refresh token.

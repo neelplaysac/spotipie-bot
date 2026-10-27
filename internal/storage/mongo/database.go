@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -13,14 +14,6 @@ import (
 	"github.com/neelplaysac/spotipie-go/internal/config"
 	"github.com/neelplaysac/spotipie-go/internal/service"
 )
-
-// codeDocument is a document in the 'codes' collection: a Spotify auth code
-// awaiting exchange when the user taps the deep link.
-type codeDocument struct {
-	ID             bson.ObjectID `bson:"_id"`
-	AuthCode       string        `bson:"authCode"`
-	TelegramUserID string        `bson:"telegram_user_id"`
-}
 
 // userDocument is a document in the 'users' collection (Spotify users).
 type userDocument struct {
@@ -44,33 +37,52 @@ type CountDoc struct {
 }
 
 type Database struct {
-	logger *slog.Logger
-	client *mongo.Client
-	codes  *mongo.Collection
-	users  *mongo.Collection
-	lastfm *mongo.Collection
+	logger         *slog.Logger
+	client         *mongo.Client
+	authorizations *mongo.Collection
+	users          *mongo.Collection
+	lastfm         *mongo.Collection
 }
 
 func New(cfg *config.Config, logger *slog.Logger) (*Database, error) {
-	uri := fmt.Sprintf(
-		"mongodb://%s:%s@%s-shard-00-00.ibx7n.mongodb.net:27017,%s-shard-00-01.ibx7n.mongodb.net:27017,%s-shard-00-02.ibx7n.mongodb.net:27017/%s?ssl=true&replicaSet=atlas-lnda18-shard-0&authSource=admin&retryWrites=true&w=majority",
-		cfg.MongoUser, cfg.MongoPass,
-		cfg.MongoColl, cfg.MongoColl, cfg.MongoColl, cfg.MongoColl,
-	)
-
-	client, err := mongo.Connect(options.Client().ApplyURI(uri))
-	if err != nil {
-		return nil, err
+	uri := cfg.MongoURI
+	if uri == "" {
+		uri = fmt.Sprintf(
+			"mongodb://%s:%s@%s-shard-00-00.ibx7n.mongodb.net:27017,%s-shard-00-01.ibx7n.mongodb.net:27017,%s-shard-00-02.ibx7n.mongodb.net:27017/%s?ssl=true&replicaSet=atlas-lnda18-shard-0&authSource=admin&retryWrites=true&w=majority",
+			url.QueryEscape(cfg.MongoUser), url.QueryEscape(cfg.MongoPass),
+			cfg.MongoColl, cfg.MongoColl, cfg.MongoColl, cfg.MongoColl,
+		)
 	}
 
-	db := client.Database(cfg.MongoColl) // db name mirrors the uri path segment
-	return &Database{
-		logger: logger,
-		client: client,
-		codes:  db.Collection("codes"),
-		users:  db.Collection("users"),
-		lastfm: db.Collection("lastfm"),
-	}, nil
+	client, err := mongo.Connect(options.Client().ApplyURI(uri).SetTimeout(10 * time.Second))
+	if err != nil {
+		// URI validation errors may echo credentials from the connection string.
+		return nil, fmt.Errorf("invalid MongoDB connection configuration")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := client.Ping(ctx, nil); err != nil {
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer closeCancel()
+		_ = client.Disconnect(closeCtx)
+		return nil, fmt.Errorf("ping MongoDB: %w", err)
+	}
+	db := client.Database(cfg.DatabaseName())
+	store := &Database{
+		logger: logger, client: client,
+		authorizations: db.Collection("oauth_sessions"),
+		users:          db.Collection("users"), lastfm: db.Collection("lastfm"),
+	}
+	if err := store.ensureAuthorizationIndexes(ctx); err != nil {
+		store.Close()
+		return nil, fmt.Errorf("create authorization indexes: %w", err)
+	}
+	return store, nil
+}
+
+func (d *Database) Ping(ctx context.Context) error {
+	return d.client.Ping(ctx, nil)
 }
 
 func (d *Database) Close() {
@@ -80,40 +92,6 @@ func (d *Database) Close() {
 	if err := d.client.Disconnect(ctx); err != nil {
 		d.logger.Error("mongo disconnect failed", "err", err)
 	}
-}
-
-// -------- 'codes' collection --------
-
-func (d *Database) AddCode(ctx context.Context, authCode, telegramUserID string) (*mongo.InsertOneResult, error) {
-	return d.codes.InsertOne(ctx, bson.M{
-		"authCode":         authCode,
-		"telegram_user_id": telegramUserID,
-	})
-}
-
-func (d *Database) FetchCode(ctx context.Context, id string) (*service.Code, error) {
-	oid, err := bson.ObjectIDFromHex(id)
-	if err != nil {
-		return nil, err
-	}
-	var doc codeDocument
-	err = d.codes.FindOne(ctx, bson.M{"_id": oid}).Decode(&doc)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return &service.Code{AuthCode: doc.AuthCode, TelegramUserID: doc.TelegramUserID}, nil
-}
-
-func (d *Database) DeleteCode(ctx context.Context, id string) error {
-	oid, err := bson.ObjectIDFromHex(id)
-	if err != nil {
-		return err
-	}
-	_, err = d.codes.DeleteOne(ctx, bson.M{"_id": oid})
-	return err
 }
 
 // -------- 'users' collection --------
@@ -237,4 +215,5 @@ func (d *Database) ToggleCounter(ctx context.Context, tgID, value string) error 
 }
 
 var _ service.AccountRepository = (*Database)(nil)
+var _ service.AuthorizationRepository = (*Database)(nil)
 var _ service.PlaybackRepository = (*Database)(nil)

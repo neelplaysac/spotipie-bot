@@ -28,6 +28,12 @@ RUN --mount=type=cache,target=/go/pkg/mod \
         -ldflags="-s -w" \
         -o /out/spotipie-go ./cmd/spotipie
 
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build \
+        -trimpath -ldflags="-s -w" \
+        -o /out/spotipie-authserver ./cmd/authserver
+
 # ---------- runtime stage ----------
 # Distroless ships ca-certificates (HTTPS to Telegram / Spotify / Last.fm) and
 # runs as nonroot. There is no RUN step here, so a linux/arm64 image builds
@@ -39,13 +45,15 @@ FROM gcr.io/distroless/static-debian12:nonroot AS runtime
 WORKDIR /app
 
 COPY --from=builder /out/spotipie-go /app/spotipie-go
+COPY --from=builder /out/spotipie-authserver /app/spotipie-authserver
 # The app loads fonts from the relative "fonts/" directory at runtime.
 COPY fonts/ /app/fonts/
 
 # distroless:nonroot
 USER 65532:65532
 
-# No EXPOSE: this bot uses Telegram long polling, it accepts no inbound traffic.
+# Only the authserver command listens on HTTP. The bot still uses long polling.
+EXPOSE 6969
 STOPSIGNAL SIGTERM
 
 ENTRYPOINT ["/app/spotipie-go"]

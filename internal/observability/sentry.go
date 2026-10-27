@@ -130,7 +130,7 @@ func (h *sentryLogHandler) WithGroup(name string) slog.Handler {
 
 func sentryScrubber(cfg *config.Config) func(*sentry.Event, *sentry.EventHint) *sentry.Event {
 	var replacements []string
-	for _, secret := range []string{cfg.APIKey, cfg.SpotifyClientID, cfg.SpotifyClientSecret, cfg.MongoPass, cfg.LastFMAPIKey, cfg.SentryDSN} {
+	for _, secret := range []string{cfg.APIKey, cfg.SpotifyClientID, cfg.SpotifyClientSecret, cfg.MongoPass, cfg.MongoURI, cfg.LastFMAPIKey, cfg.SentryDSN} {
 		if secret != "" {
 			for _, value := range []string{secret, url.QueryEscape(secret), url.PathEscape(secret)} {
 				replacements = append(replacements, value, "<redacted>")

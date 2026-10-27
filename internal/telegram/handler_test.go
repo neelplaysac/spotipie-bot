@@ -3,9 +3,12 @@ package telegram
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 
@@ -33,13 +36,28 @@ func (a *telegramClientStub) RequestWithContext(_ context.Context, _, method str
 
 type accountStoreStub struct {
 	service.AccountRepository
-	user   *service.User
-	name   string
-	fmName string
+	service.AuthorizationRepository
+	user       *service.User
+	name       string
+	fmName     string
+	createdFor string
+	createErr  error
 }
 
-func (r *accountStoreStub) FetchCode(context.Context, string) (*service.Code, error) { return nil, nil }
-func (r *accountStoreStub) DeleteCode(context.Context, string) error                 { return nil }
+func (r *accountStoreStub) CreateAuthorization(_ context.Context, _, owner string, _ time.Time) error {
+	r.createdFor = owner
+	return r.createErr
+}
+
+type spotifyAuthorizationStub struct{ service.SpotifyAuthorization }
+
+func (spotifyAuthorizationStub) AuthURL(state string) string {
+	return "https://accounts.spotify.com/authorize?state=" + state
+}
+
+func (r *accountStoreStub) ConsumeAuthorization(context.Context, string, string, time.Time) (*service.Code, error) {
+	return nil, nil
+}
 func (r *accountStoreStub) FetchData(context.Context, string) (*service.User, error) {
 	return r.user, nil
 }
@@ -59,8 +77,34 @@ func newTestHandler(repo *accountStoreStub) (*Handler, *gotgbot.Bot, *telegramCl
 	api := &telegramClientStub{BaseBotClient: &gotgbot.BaseBotClient{}}
 	bot := &gotgbot.Bot{User: gotgbot.User{Username: "testbot"}, BotClient: api}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	handler := New(&config.Config{}, service.NewAccounts(repo, nil), service.NewPlayback(repo, nil, nil, nil), logger, "testbot")
+	handler := New(&config.Config{}, service.NewAccounts(repo, spotifyAuthorizationStub{}, service.NewAuthorization(repo)), service.NewPlayback(repo, nil, nil, nil), logger, "testbot")
 	return handler, bot, api
+}
+
+func TestRegisterCreatesUserBoundLinkAndHandlesStorageFailure(t *testing.T) {
+	for _, fail := range []bool{false, true} {
+		repo := &accountStoreStub{}
+		if fail {
+			repo.createErr = errors.New("database unavailable")
+		}
+		handler, bot, api := newTestHandler(repo)
+		if err := handler.Dispatcher().ProcessUpdate(bot, messageUpdate("/register"), nil); err != nil {
+			t.Fatal(err)
+		}
+		if repo.createdFor != "42" || len(api.calls) != 1 {
+			t.Fatalf("owner=%s calls=%v", repo.createdFor, api.calls)
+		}
+		if fail {
+			if api.calls[0].params["text"] != "Unable to start registration. Please try /register again shortly." {
+				t.Fatal("missing registration failure response")
+			}
+		} else {
+			raw, err := json.Marshal(api.calls[0].params)
+			if err != nil || !strings.Contains(string(raw), "https://accounts.spotify.com/authorize?state=") {
+				t.Fatal("registration reply did not contain the state-bearing Spotify link")
+			}
+		}
+	}
 }
 
 func messageUpdate(text string) *gotgbot.Update {

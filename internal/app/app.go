@@ -56,7 +56,7 @@ func Run(testMonitoring bool) int {
 		return 1
 	}
 
-	logger.Info("configuration loaded", "bot_username", cfg.BotUsername, "mongo_db", cfg.MongoColl, "temp_channel", cfg.TempChannel, "admins", len(cfg.AdminIDs), "log_level", logLevel.Level().String())
+	logger.Info("configuration loaded", "bot_username", cfg.BotUsername, "mongo_db", cfg.DatabaseName(), "temp_channel", cfg.TempChannel, "admins", len(cfg.AdminIDs), "log_level", logLevel.Level().String())
 
 	db, err := mongostore.New(cfg, logger)
 	if err != nil {
@@ -65,12 +65,12 @@ func Run(testMonitoring bool) int {
 	}
 	defer db.Close()
 
-	logger.Info("connected to database", "db", cfg.MongoColl)
+	logger.Info("connected to database", "db", cfg.DatabaseName())
 
 	spotifyClient := spotify.New(cfg, logger)
 	lastFMClient := lastfm.New(cfg, logger)
 	renderer := card.New(logger, "fonts")
-	accounts := service.NewAccounts(db, spotifyClient)
+	accounts := service.NewAccounts(db, spotifyClient, service.NewAuthorization(db))
 	playback := service.NewPlayback(db, spotifyClient, lastFMClient, renderer)
 
 	if cfg.TempChannel == 0 {
@@ -83,6 +83,10 @@ func Run(testMonitoring bool) int {
 		return 1
 	}
 	botUsername := bot.User.Username
+	if err := cfg.ValidateBotIdentity(botUsername); err != nil {
+		logger.Error("invalid Telegram return link", "err", err)
+		return 1
+	}
 
 	logger.Info("Starting Spotipie Bot...", "username", botUsername)
 

@@ -52,6 +52,7 @@ func (h *Handler) startHandler(b *gotgbot.Bot, c *ext.Context) error {
 		tgID := strconv.FormatInt(c.EffectiveUser.Id, 10)
 		status, err := h.accounts.CompleteSpotifyRegistration(ctx, text[7:], tgID)
 		if err != nil {
+			h.logger.ErrorContext(ctx, "failed to complete Spotify registration", "err", err)
 			_ = sendText(b, ctx, msg.Chat.Id, "Database Error", nil)
 			return nil
 		}
@@ -91,7 +92,11 @@ func (h *Handler) registerHandler(b *gotgbot.Bot, c *ext.Context) error {
 	}
 
 	if msg.Chat.Type == "private" {
-		authURL := h.accounts.SpotifyAuthURL()
+		authURL, err := h.accounts.SpotifyAuthURL(ctx, strconv.FormatInt(c.EffectiveUser.Id, 10))
+		if err != nil {
+			h.logger.ErrorContext(ctx, "failed to create authorization session", "err", err)
+			return sendText(b, ctx, msg.Chat.Id, "Unable to start registration. Please try /register again shortly.", nil)
+		}
 		markup := kb([][]gotgbot.InlineKeyboardButton{
 			{{Text: "Open this link to register", Url: authURL}},
 		})
