@@ -26,7 +26,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build \
         -trimpath \
         -ldflags="-s -w" \
-        -o /out/spotipie-go .
+        -o /out/spotipie-go ./cmd/spotipie
 
 # ---------- runtime stage ----------
 # Distroless ships ca-certificates (HTTPS to Telegram / Spotify / Last.fm) and

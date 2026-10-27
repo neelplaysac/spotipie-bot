@@ -1,4 +1,4 @@
-package main
+package card
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"image/color"
 	"image/draw"
 	"image/jpeg"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -18,6 +19,9 @@ import (
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
+
+	"github.com/neelplaysac/spotipie-go/internal/observability"
+	"github.com/neelplaysac/spotipie-go/internal/service"
 )
 
 const (
@@ -27,11 +31,17 @@ const (
 	// lastfm fallback cover art (replaces empty / placeholder images)
 	lastFMPlaceholder = "https://lastfm.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png"
 	lastFMLogo        = "https://files.catbox.moe/098341.png"
-
-	fontsDir = "fonts"
 )
 
-var httpClient = &http.Client{Timeout: 30 * 1e9}
+type Renderer struct {
+	logger   *slog.Logger
+	fontsDir string
+	http     *http.Client
+}
+
+func New(logger *slog.Logger, fontsDir string) *Renderer {
+	return &Renderer{logger: logger, fontsDir: fontsDir, http: &http.Client{Timeout: 30 * 1e9}}
+}
 
 type fontSet struct {
 	name   string
@@ -46,8 +56,8 @@ var fontKey = map[string]string{
 	"arial":     "arial-unicode-ms.ttf",
 }
 
-func loadFont(name string, size float64) (*fontSet, error) {
-	path := fontsDir + "/" + fontKey[name]
+func (r *Renderer) loadFont(name string, size float64) (*fontSet, error) {
+	path := r.fontsDir + "/" + fontKey[name]
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -124,8 +134,8 @@ func drawStringAt(img draw.Image, f *fontSet, x, y float64, fill color.Color, te
 }
 
 // getCover downloads the album art bytes.
-func getCover(url string) ([]byte, error) {
-	resp, err := httpClient.Get(url)
+func (r *Renderer) getCover(url string) ([]byte, error) {
+	resp, err := r.http.Get(url)
 	if err != nil {
 		return nil, err
 	}
@@ -221,9 +231,9 @@ func adjustContrastPillow(img image.Image, factor float64) *image.NRGBA {
 	})
 }
 
-// drawImage generates the spotify "now playing" card (600x250 JPEG).
+// Spotify generates the Spotify "now playing" card (600x250 JPEG).
 // style is "blur" or "black".
-func drawImage(res *SpotifyPlayback, username string, pfp []byte, style string) ([]byte, error) {
+func (r *Renderer) Spotify(res *service.SpotifyPlayback, username string, pfp []byte, style string) ([]byte, error) {
 	start := time.Now()
 	songname := res.Item.Name
 	albumname := res.Item.Album.Name
@@ -246,7 +256,7 @@ func drawImage(res *SpotifyPlayback, username string, pfp []byte, style string) 
 
 	// album art
 	if coverart != "" {
-		if cover, err := getCover(coverart); err == nil {
+		if cover, err := r.getCover(coverart); err == nil {
 			if style == "blur" {
 				if bg, err := makeBlurBackground(cover); err == nil {
 					canvas = imaging.Paste(canvas, bg, image.Pt(0, 0))
@@ -258,7 +268,7 @@ func drawImage(res *SpotifyPlayback, username string, pfp []byte, style string) 
 				canvas = imaging.Paste(canvas, thumb, image.Pt(25, 25))
 			}
 		} else {
-			logger.Warn("failed to fetch spotify cover", "err", err, "url", coverart)
+			r.logger.Warn("failed to fetch spotify cover", "err", err, "url", coverart)
 		}
 	}
 
@@ -271,19 +281,19 @@ func drawImage(res *SpotifyPlayback, username string, pfp []byte, style string) 
 	}
 
 	// fonts
-	openSans, err := loadFont("open_sans", 24)
+	openSans, err := r.loadFont("open_sans", 24)
 	if err != nil {
 		return nil, err
 	}
-	poppins, err := loadFont("poppins", 26)
+	poppins, err := r.loadFont("poppins", 26)
 	if err != nil {
 		return nil, err
 	}
-	arial, err := loadFont("arial", 26)
+	arial, err := r.loadFont("arial", 26)
 	if err != nil {
 		return nil, err
 	}
-	arial23, err := loadFont("arial", 23)
+	arial23, err := r.loadFont("arial", 23)
 	if err != nil {
 		return nil, err
 	}
@@ -332,13 +342,13 @@ func drawImage(res *SpotifyPlayback, username string, pfp []byte, style string) 
 
 	img, err := encodeJPEG(dc.Image())
 	if err == nil {
-		logger.Debug("rendered card", "kind", "now", "bytes", len(img), logDuration(start))
+		r.logger.Debug("rendered card", "kind", "now", "bytes", len(img), observability.Duration(start))
 	}
 	return img, err
 }
 
-// blurrImage generates the lastfm card.
-func blurrImage(track *LastFMTrack, username string, pfp []byte, scrobbles string) ([]byte, error) {
+// LastFM generates the Last.fm card.
+func (r *Renderer) LastFM(track *service.LastFMTrack, username string, pfp []byte, scrobbles string) ([]byte, error) {
 	start := time.Now()
 	coverart := ""
 	if len(track.Image) > 3 {
@@ -360,7 +370,7 @@ func blurrImage(track *LastFMTrack, username string, pfp []byte, scrobbles strin
 	canvas := imaging.New(canvasW, canvasH, color.RGBA{18, 18, 18, 255})
 
 	// album art (always blurred for lastfm)
-	if cover, err := getCover(coverart); err == nil {
+	if cover, err := r.getCover(coverart); err == nil {
 		if bg, err := makeBlurBackground(cover); err == nil {
 			canvas = imaging.Paste(canvas, bg, image.Pt(0, 0))
 		}
@@ -369,7 +379,7 @@ func blurrImage(track *LastFMTrack, username string, pfp []byte, scrobbles strin
 			canvas = imaging.Paste(canvas, thumb, image.Pt(25, 25))
 		}
 	} else {
-		logger.Warn("failed to fetch lastfm cover", "err", err, "url", coverart)
+		r.logger.Warn("failed to fetch lastfm cover", "err", err, "url", coverart)
 	}
 
 	// profile pic
@@ -381,23 +391,23 @@ func blurrImage(track *LastFMTrack, username string, pfp []byte, scrobbles strin
 	}
 
 	// fonts
-	openSans, err := loadFont("open_sans", 24)
+	openSans, err := r.loadFont("open_sans", 24)
 	if err != nil {
 		return nil, err
 	}
-	poppins, err := loadFont("poppins", 26)
+	poppins, err := r.loadFont("poppins", 26)
 	if err != nil {
 		return nil, err
 	}
-	arial, err := loadFont("arial", 26)
+	arial, err := r.loadFont("arial", 26)
 	if err != nil {
 		return nil, err
 	}
-	arial23, err := loadFont("arial", 23)
+	arial23, err := r.loadFont("arial", 23)
 	if err != nil {
 		return nil, err
 	}
-	bold, err := loadFont("open_bold", 22)
+	bold, err := r.loadFont("open_bold", 22)
 	if err != nil {
 		return nil, err
 	}
@@ -444,7 +454,7 @@ func blurrImage(track *LastFMTrack, username string, pfp []byte, scrobbles strin
 
 	img, err := encodeJPEG(dc.Image())
 	if err == nil {
-		logger.Debug("rendered card", "kind", "last", "bytes", len(img), logDuration(start))
+		r.logger.Debug("rendered card", "kind", "last", "bytes", len(img), observability.Duration(start))
 	}
 	return img, err
 }

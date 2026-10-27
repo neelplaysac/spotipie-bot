@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"os"
@@ -6,10 +6,6 @@ import (
 	"strings"
 
 	"github.com/joho/godotenv"
-)
-
-const (
-	BOT_URL = "t.me/%s"
 )
 
 type Config struct {
@@ -31,7 +27,7 @@ type Config struct {
 	SentryTracesSampleRate string
 }
 
-func loadConfig() *Config {
+func Load() *Config {
 	// Load environment variables from .env file
 	_ = godotenv.Load()
 
@@ -76,7 +72,7 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
-func (c *Config) missingRequired() []string {
+func (c *Config) MissingRequired() []string {
 	var missing []string
 	if c.APIKey == "" {
 		missing = append(missing, "API_KEY")

@@ -1,4 +1,4 @@
-package main
+package observability
 
 import (
 	"log/slog"
@@ -7,10 +7,6 @@ import (
 	"strings"
 	"time"
 )
-
-var logLevel = new(slog.LevelVar)
-
-var logger *slog.Logger
 
 var botTokenRe = regexp.MustCompile(`bot[0-9]{5,}:[A-Za-z0-9_-]{20,}`)
 
@@ -47,15 +43,13 @@ func redactAttr(_ []string, a slog.Attr) slog.Attr {
 	}
 }
 
-func logDuration(start time.Time) slog.Attr {
+func Duration(start time.Time) slog.Attr {
 	return slog.Duration("took", time.Since(start))
 }
 
-func init() {
-	configureLogging()
-}
-
-func configureLogging() {
+func NewLogger() (*slog.Logger, *slog.LevelVar) {
+	logLevel := new(slog.LevelVar)
+	var logger *slog.Logger
 	switch strings.ToLower(os.Getenv("LOG_LEVEL")) {
 	case "debug":
 		logLevel.Set(slog.LevelDebug)
@@ -76,5 +70,5 @@ func configureLogging() {
 	} else {
 		logger = slog.New(slog.NewTextHandler(os.Stdout, opts))
 	}
-	slog.SetDefault(logger)
+	return logger, logLevel
 }

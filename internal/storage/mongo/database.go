@@ -1,33 +1,37 @@
-package main
+package mongostore
 
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
+
+	"github.com/neelplaysac/spotipie-go/internal/config"
+	"github.com/neelplaysac/spotipie-go/internal/service"
 )
 
-// CodeDoc is a document in the 'codes' collection: a Spotify auth code
+// codeDocument is a document in the 'codes' collection: a Spotify auth code
 // awaiting exchange when the user taps the deep link.
-type CodeDoc struct {
+type codeDocument struct {
 	ID             bson.ObjectID `bson:"_id"`
 	AuthCode       string        `bson:"authCode"`
 	TelegramUserID string        `bson:"telegram_user_id"`
 }
 
-// UserDoc is a document in the 'users' collection (Spotify users).
-type UserDoc struct {
+// userDocument is a document in the 'users' collection (Spotify users).
+type userDocument struct {
 	Username string `bson:"username"`
 	Token    string `bson:"token"`
 	Style    string `bson:"style"`
 	TgID     string `bson:"tg_id"`
 }
 
-// LastFMUserDoc is a document in the 'lastfm' collection.
-type LastFMUserDoc struct {
+// lastFMDocument is a document in the 'lastfm' collection.
+type lastFMDocument struct {
 	FMUsername string `bson:"fm_username"`
 	Name       string `bson:"name"`
 	TgID       string `bson:"tg_id"`
@@ -40,13 +44,14 @@ type CountDoc struct {
 }
 
 type Database struct {
+	logger *slog.Logger
 	client *mongo.Client
 	codes  *mongo.Collection
 	users  *mongo.Collection
 	lastfm *mongo.Collection
 }
 
-func newDatabase(cfg *Config) (*Database, error) {
+func New(cfg *config.Config, logger *slog.Logger) (*Database, error) {
 	uri := fmt.Sprintf(
 		"mongodb://%s:%s@%s-shard-00-00.ibx7n.mongodb.net:27017,%s-shard-00-01.ibx7n.mongodb.net:27017,%s-shard-00-02.ibx7n.mongodb.net:27017/%s?ssl=true&replicaSet=atlas-lnda18-shard-0&authSource=admin&retryWrites=true&w=majority",
 		cfg.MongoUser, cfg.MongoPass,
@@ -60,6 +65,7 @@ func newDatabase(cfg *Config) (*Database, error) {
 
 	db := client.Database(cfg.MongoColl) // db name mirrors the uri path segment
 	return &Database{
+		logger: logger,
 		client: client,
 		codes:  db.Collection("codes"),
 		users:  db.Collection("users"),
@@ -72,7 +78,7 @@ func (d *Database) Close() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := d.client.Disconnect(ctx); err != nil {
-		logger.Error("mongo disconnect failed", "err", err)
+		d.logger.Error("mongo disconnect failed", "err", err)
 	}
 }
 
@@ -85,36 +91,45 @@ func (d *Database) AddCode(ctx context.Context, authCode, telegramUserID string)
 	})
 }
 
-func (d *Database) FetchCode(ctx context.Context, id bson.ObjectID) (*CodeDoc, error) {
-	var doc CodeDoc
-	err := d.codes.FindOne(ctx, bson.M{"_id": id}).Decode(&doc)
+func (d *Database) FetchCode(ctx context.Context, id string) (*service.Code, error) {
+	oid, err := bson.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
+	}
+	var doc codeDocument
+	err = d.codes.FindOne(ctx, bson.M{"_id": oid}).Decode(&doc)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return &doc, nil
+	return &service.Code{AuthCode: doc.AuthCode, TelegramUserID: doc.TelegramUserID}, nil
 }
 
-func (d *Database) DeleteCode(ctx context.Context, id bson.ObjectID) error {
-	_, err := d.codes.DeleteOne(ctx, bson.M{"_id": id})
+func (d *Database) DeleteCode(ctx context.Context, id string) error {
+	oid, err := bson.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+	_, err = d.codes.DeleteOne(ctx, bson.M{"_id": oid})
 	return err
 }
 
 // -------- 'users' collection --------
 
-func (d *Database) AddUser(ctx context.Context, tgID, token string) (*mongo.InsertOneResult, error) {
-	return d.users.InsertOne(ctx, bson.M{
+func (d *Database) AddUser(ctx context.Context, tgID, token string) error {
+	_, err := d.users.InsertOne(ctx, bson.M{
 		"username": "User",
 		"token":    token,
 		"style":    "blur",
 		"tg_id":    tgID,
 	})
+	return err
 }
 
-func (d *Database) FetchData(ctx context.Context, tgID string) (*UserDoc, error) {
-	var doc UserDoc
+func (d *Database) FetchData(ctx context.Context, tgID string) (*service.User, error) {
+	var doc userDocument
 	err := d.users.FindOne(ctx, bson.M{"tg_id": tgID}).Decode(&doc)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -122,7 +137,7 @@ func (d *Database) FetchData(ctx context.Context, tgID string) (*UserDoc, error)
 		}
 		return nil, err
 	}
-	return &doc, nil
+	return &service.User{Username: doc.Username, Token: doc.Token, Style: doc.Style, TgID: doc.TgID}, nil
 }
 
 func (d *Database) UpdateData(ctx context.Context, tgID, value string) error {
@@ -144,7 +159,7 @@ func (d *Database) CountAll(ctx context.Context) (int64, error) {
 	return d.users.CountDocuments(ctx, bson.M{})
 }
 
-func (d *Database) AggregateUsers(ctx context.Context) ([]CountDoc, error) {
+func (d *Database) AggregateUsers(ctx context.Context) ([]service.Count, error) {
 	pipeline := bson.A{
 		bson.M{"$unwind": "$style"},
 		bson.M{"$group": bson.M{"_id": "$style", "count": bson.M{"$sum": 1}}},
@@ -152,7 +167,7 @@ func (d *Database) AggregateUsers(ctx context.Context) ([]CountDoc, error) {
 	return d.aggregate(ctx, d.users, pipeline)
 }
 
-func (d *Database) AggregateLastFMUsers(ctx context.Context) ([]CountDoc, error) {
+func (d *Database) AggregateLastFMUsers(ctx context.Context) ([]service.Count, error) {
 	pipeline := bson.A{
 		bson.M{"$unwind": "$counter"},
 		bson.M{"$group": bson.M{"_id": "$counter", "count": bson.M{"$sum": 1}}},
@@ -160,7 +175,7 @@ func (d *Database) AggregateLastFMUsers(ctx context.Context) ([]CountDoc, error)
 	return d.aggregate(ctx, d.lastfm, pipeline)
 }
 
-func (d *Database) aggregate(ctx context.Context, coll *mongo.Collection, pipeline any) ([]CountDoc, error) {
+func (d *Database) aggregate(ctx context.Context, coll *mongo.Collection, pipeline any) ([]service.Count, error) {
 	cursor, err := coll.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
@@ -171,22 +186,27 @@ func (d *Database) aggregate(ctx context.Context, coll *mongo.Collection, pipeli
 	if err := cursor.All(ctx, &out); err != nil {
 		return nil, err
 	}
-	return out, nil
+	result := make([]service.Count, 0, len(out))
+	for _, count := range out {
+		result = append(result, service.Count{ID: count.ID, Count: count.Count})
+	}
+	return result, nil
 }
 
 // -------- 'lastfm' collection --------
 
-func (d *Database) AddLastFMUser(ctx context.Context, tgID, lastfmUsername string) (*mongo.InsertOneResult, error) {
-	return d.lastfm.InsertOne(ctx, bson.M{
+func (d *Database) AddLastFMUser(ctx context.Context, tgID, lastfmUsername string) error {
+	_, err := d.lastfm.InsertOne(ctx, bson.M{
 		"fm_username": lastfmUsername,
 		"name":        "User",
 		"tg_id":       tgID,
 		"counter":     "on",
 	})
+	return err
 }
 
-func (d *Database) GetLastFMUser(ctx context.Context, tgID string) (*LastFMUserDoc, error) {
-	var doc LastFMUserDoc
+func (d *Database) GetLastFMUser(ctx context.Context, tgID string) (*service.LastFMUser, error) {
+	var doc lastFMDocument
 	err := d.lastfm.FindOne(ctx, bson.M{"tg_id": tgID}).Decode(&doc)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -194,7 +214,7 @@ func (d *Database) GetLastFMUser(ctx context.Context, tgID string) (*LastFMUserD
 		}
 		return nil, err
 	}
-	return &doc, nil
+	return &service.LastFMUser{FMUsername: doc.FMUsername, Name: doc.Name, TgID: doc.TgID, Counter: doc.Counter}, nil
 }
 
 func (d *Database) UpdateLastFMData(ctx context.Context, tgID, value string) error {
@@ -215,3 +235,6 @@ func (d *Database) ToggleCounter(ctx context.Context, tgID, value string) error 
 	_, err := d.lastfm.UpdateOne(ctx, bson.M{"tg_id": tgID}, bson.M{"$set": bson.M{"counter": value}})
 	return err
 }
+
+var _ service.AccountRepository = (*Database)(nil)
+var _ service.PlaybackRepository = (*Database)(nil)

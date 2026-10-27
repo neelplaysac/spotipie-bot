@@ -1,6 +1,7 @@
-package main
+package telegram
 
 import (
+	"log/slog"
 	"math"
 	"sync"
 	"time"
@@ -9,12 +10,13 @@ import (
 // cooldownManager is an in-memory per-user per-handler cooldown store,
 // mirroring the python bot's decorator behaviour.
 type cooldownManager struct {
+	logger    *slog.Logger
 	mu        sync.Mutex
 	cooldowns map[int64]map[string]time.Time
 }
 
-func newCooldownManager() *cooldownManager {
-	return &cooldownManager{cooldowns: map[int64]map[string]time.Time{}}
+func newCooldownManager(logger *slog.Logger) *cooldownManager {
+	return &cooldownManager{logger: logger, cooldowns: map[int64]map[string]time.Time{}}
 }
 
 // Check returns 0 if the user may proceed (and records the invocation),
@@ -35,7 +37,7 @@ func (c *cooldownManager) Check(userID int64, handler string, seconds int) int {
 			if remaining < 1 {
 				remaining = 1
 			}
-			logger.Debug("rate limited", "handler", handler, "user_id", userID, "retry_in_s", remaining)
+			c.logger.Debug("rate limited", "handler", handler, "user_id", userID, "retry_in_s", remaining)
 			return remaining
 		}
 	}

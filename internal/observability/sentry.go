@@ -1,4 +1,4 @@
-package main
+package observability
 
 import (
 	"context"
@@ -10,23 +10,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/getsentry/sentry-go"
+
+	"github.com/neelplaysac/spotipie-go/internal/config"
 )
 
-const monitoringContextKey = "spotipie.monitoring.context"
-
-func initMonitoring(cfg *Config) error {
+func Init(cfg *config.Config, logger *slog.Logger) (*slog.Logger, error) {
 	// Do not initialize the SDK with an empty DSN: error monitoring is opt-in.
 	if cfg.SentryDSN == "" {
 		logger.Info("GlitchTip monitoring disabled; SENTRY_DSN is not set")
-		return nil
+		return logger, nil
 	}
 
 	rate, err := strconv.ParseFloat(cfg.SentryTracesSampleRate, 64)
 	if err != nil || math.IsNaN(rate) || math.IsInf(rate, 0) || rate < 0 || rate > 1 {
-		return fmt.Errorf("SENTRY_TRACES_SAMPLE_RATE must be a number between 0 and 1")
+		return logger, fmt.Errorf("SENTRY_TRACES_SAMPLE_RATE must be a number between 0 and 1")
 	}
 
 	scrub := sentryScrubber(cfg)
@@ -43,16 +41,15 @@ func initMonitoring(cfg *Config) error {
 		BeforeSendTransaction: scrub,
 	}); err != nil {
 		// SDK configuration errors may contain the DSN. Keep it out of logs.
-		return fmt.Errorf("invalid SENTRY_DSN; copy the Go project DSN from GlitchTip")
+		return logger, fmt.Errorf("invalid SENTRY_DSN; copy the Go project DSN from GlitchTip")
 	}
 
 	logger = slog.New(&sentryLogHandler{next: logger.Handler()})
-	slog.SetDefault(logger)
 	logger.Info("GlitchTip monitoring enabled", "environment", cfg.SentryEnvironment, "release", cfg.SentryRelease, "traces_sample_rate", rate)
-	return nil
+	return logger, nil
 }
 
-func flushMonitoring() {
+func Flush(logger *slog.Logger) {
 	if !sentry.CurrentHub().Client().IsEnabled() {
 		return
 	}
@@ -61,9 +58,6 @@ func flushMonitoring() {
 	}
 }
 
-// Error-level logs include failures which handlers catch without returning to
-// the dispatcher. Send ordinary Sentry events, supported by GlitchTip, rather
-// than the separate Sentry Logs product. Keep the existing stdout logs too.
 type sentryLogHandler struct {
 	next  slog.Handler
 	attrs []slog.Attr
@@ -134,66 +128,7 @@ func (h *sentryLogHandler) WithGroup(name string) slog.Handler {
 	return &sentryLogHandler{next: h.next.WithGroup(name), attrs: h.attrs}
 }
 
-// Clone the hub for each concurrent update. Never put Telegram payloads or
-// account details on the shared global scope.
-type monitoringProcessor struct{}
-
-func (monitoringProcessor) ProcessUpdate(d *ext.Dispatcher, b *gotgbot.Bot, c *ext.Context) (err error) {
-	if !sentry.CurrentHub().Client().IsEnabled() {
-		return (ext.BaseProcessor{}).ProcessUpdate(d, b, c)
-	}
-	hub := sentry.CurrentHub().Clone()
-	ctx := sentry.SetHubOnContext(context.Background(), hub)
-	transaction := sentry.StartTransaction(ctx, updateOperation(c), sentry.WithOpName("telegram.update"))
-	if c.Data == nil {
-		c.Data = make(map[string]any)
-	}
-	c.Data[monitoringContextKey] = transaction.Context()
-	completed := false
-	defer func() {
-		if !completed || err != nil {
-			transaction.Status = sentry.SpanStatusInternalError
-		}
-		transaction.Finish()
-	}()
-	err = (ext.BaseProcessor{}).ProcessUpdate(d, b, c)
-	completed = true
-	return err
-}
-
-func updateContext(c *ext.Context) context.Context {
-	if c != nil {
-		if ctx, ok := c.Data[monitoringContextKey].(context.Context); ok {
-			return ctx
-		}
-	}
-	return context.Background()
-}
-
-func updateOperation(c *ext.Context) string {
-	switch {
-	case c.Message != nil:
-		// Whitelist command names: /start arguments contain OAuth code IDs, and
-		// ordinary messages can contain names or other private information.
-		fields := strings.Fields(c.Message.Text)
-		if len(fields) > 0 {
-			command, _, _ := strings.Cut(strings.ToLower(fields[0]), "@")
-			switch command {
-			case "/start", "/help", "/register", "/unregister", "/now", "/last", "/style", "/name", "/linkfm", "/unlinkfm", "/namefm", "/statss", "/details", "/cancel":
-				return "telegram." + strings.TrimPrefix(command, "/")
-			}
-		}
-		return "telegram.message"
-	case c.CallbackQuery != nil:
-		return "telegram.callback_query"
-	case c.InlineQuery != nil:
-		return "telegram.inline_query"
-	default:
-		return "telegram.other"
-	}
-}
-
-func sentryScrubber(cfg *Config) func(*sentry.Event, *sentry.EventHint) *sentry.Event {
+func sentryScrubber(cfg *config.Config) func(*sentry.Event, *sentry.EventHint) *sentry.Event {
 	var replacements []string
 	for _, secret := range []string{cfg.APIKey, cfg.SpotifyClientID, cfg.SpotifyClientSecret, cfg.MongoPass, cfg.LastFMAPIKey, cfg.SentryDSN} {
 		if secret != "" {
@@ -225,8 +160,6 @@ func sentryScrubber(cfg *Config) func(*sentry.Event, *sentry.EventHint) *sentry.
 	}
 }
 
-// Source snippets and local variables can contain credentials. Retain stack
-// locations so reports still identify the function, file, and line number.
 func stripStackData(stack *sentry.Stacktrace) {
 	if stack == nil {
 		return
